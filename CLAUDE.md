@@ -246,6 +246,15 @@ AND generator — not just parse + emit (see CONTRIBUTING.md).
   warnings and info and collapses errors into one `PackageFailedToCompile` per file carrying the first underlying error. `DiagnosticOptions
   .ReportDependencyDiagnostics` (CLI: `--dependency-diagnostics`) turns that off for debugging a package from a project consuming it. Opening a package's own
   files in the LSP needs no flag — the package is the entry root of its own unit there.
+- A chained intrinsic access used to only rename its *last* step: `frame.absolute_position.y` compiled to
+  `frame.absolute_position.Y` instead of `frame.AbsolutePosition.Y` — `GenerateRenamedAccess` read one `luau_name`
+  attribute off the whole access expression (which `SemanticModel.GetPropertySymbol` resolves to the *final* step's
+  symbol) and only ever renamed `names[^1]`, leaving every earlier step exactly as spelled in the Loom source. Harmless
+  whenever an earlier step's Loom name happened to already match its Luau one; wrong the moment it didn't, which two
+  or more intrinsic hops in one chain makes easy to hit (found building a Roblox GUI's fader-drag math). Fixed via
+  `SemanticModel.GetPropertySymbolChain`/`InterfaceSymbol.GetPropertyChainAtPath`, which walk the same path but
+  return one symbol *per step* instead of only the terminal one, so `GenerateRenamedAccess` can check every step's
+  own attribute. Regression test: `Generates_ChainedMemberAccess_RenamesEveryStepWithALuauNameAttribute`.
 - `x is T` is read as a type predicate or as a conditional type depending on whether a `?` follows the target, which the parser only finds out after reading
   it — so `_suppressOptionalSuffix` turns off the postfix `?` for the length of that target and is cleared only by `Parser.Bracketed`, for positions a closing
   bracket ends before the `?` could be reached. A target that really is optional therefore needs parens: `T is (number?) ? A : B`. A pattern's `let` binders

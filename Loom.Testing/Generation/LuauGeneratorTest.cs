@@ -4415,6 +4415,35 @@ public class LuauGeneratorTest
         Assert.Equal("my_event", variable.Name);
     }
 
+    /// <remarks>
+    ///     Regression test: a chained access like <c>a.b.c</c> used to only rename the last step, silently
+    ///     leaving an earlier step's own name unrenamed - harmless when the unrenamed step happened to match
+    ///     Luau's own spelling already, but wrong (and undetected, since nothing typo'd the Luau side to
+    ///     compare against) the moment a real one, like Roblox's <c>AbsolutePosition</c>, needed the rename
+    ///     too. See <see cref="LuauGenerator.GenerateRenamedAccess" />.
+    /// </remarks>
+    [Fact]
+    public void Generates_ChainedMemberAccess_RenamesEveryStepWithALuauNameAttribute()
+    {
+        const string source = """
+            declare interface Inner {
+                [luau_name("Y")]
+                y: number;
+            }
+            declare interface Outer {
+                [luau_name("InnerValue")]
+                inner: Inner;
+            }
+            let outer = none as never as Outer;
+            let value = outer.inner.y;
+            """;
+
+        var luauTree = Utility.GetLuauAST(source, true);
+        var variable = Assert.IsType<ConstVariable>(luauTree.Statements[^1]);
+        var access = Assert.IsType<PropertyAccess>(variable.Initializer);
+        Assert.Equal(["InnerValue", "Y"], access.Names);
+    }
+
     [Fact]
     public void Generates_Match_EmptyArms_ReturnsNil()
     {

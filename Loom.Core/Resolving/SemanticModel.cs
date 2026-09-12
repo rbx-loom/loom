@@ -269,20 +269,38 @@ public sealed record SemanticModel(Tree Tree, DiagnosticBag Diagnostics, SymbolT
     /// <summary>Every declaration the expression's member name has, which is more than one only for an overload set.</summary>
     public IReadOnlyList<PropertySymbol> GetPropertySymbols(Expression expression)
     {
-        var (objectExpression, names) = expression switch
-        {
-            QualifiedName qualified => (qualified.Identifier as Expression, qualified.Names.Select(d => d.Name.Text).ToArray()),
-            PropertyAccess propertyAccess => (propertyAccess.Expression, propertyAccess.Names.Select(d => d.Name.Text).ToArray()),
-            ElementAccess { IndexExpression: Literal { Value: string propertyName } } elementAccess => (elementAccess.Expression, [propertyName]),
-            _ => (expression, [])
-        };
-
-        if (names.Length == 0)
+        var (objectExpression, names) = SplitAccessExpression(expression);
+        if (objectExpression == null || names.Length == 0)
             return [];
 
         var receiverType = ChainAwaitedReceiverTypes.TryGetValue(expression.Id, out var settled) ? settled : GetType(objectExpression);
         return GetPropertySymbols(receiverType, names);
     }
+
+    /// <summary>
+    ///     One property symbol per step of a chained access like <c>a.b.c</c>, in order - unlike
+    ///     <see cref="GetPropertySymbols(Expression)" />, which only exposes the last step's (overload)
+    ///     symbols. <see cref="LuauGenerator.GenerateRenamedAccess" /> is the one caller: a chain can need a
+    ///     <c>luau_name</c> rename at every step, not just the last.
+    /// </summary>
+    public IReadOnlyList<PropertySymbol?> GetPropertySymbolChain(Expression expression)
+    {
+        var (objectExpression, names) = SplitAccessExpression(expression);
+        if (objectExpression == null || names.Length == 0)
+            return [];
+
+        var receiverType = ChainAwaitedReceiverTypes.TryGetValue(expression.Id, out var settled) ? settled : GetType(objectExpression);
+        return GetPropertySymbolChain(receiverType, names);
+    }
+
+    private static (Expression? Object, string[] Names) SplitAccessExpression(Expression expression) =>
+        expression switch
+        {
+            QualifiedName qualified => (qualified.Identifier, qualified.Names.Select(d => d.Name.Text).ToArray()),
+            PropertyAccess propertyAccess => (propertyAccess.Expression, propertyAccess.Names.Select(d => d.Name.Text).ToArray()),
+            ElementAccess { IndexExpression: Literal { Value: string propertyName } } elementAccess => (elementAccess.Expression, [propertyName]),
+            _ => (expression, [])
+        };
 
     /// <summary> Looks up a property by path directly off a type, for callers with no access-expression node to read it from (e.g. a match object pattern field). </summary>
     public PropertySymbol? GetPropertySymbol(Type objectType, IReadOnlyList<string> path) => GetPropertySymbols(objectType, path).FirstOrDefault();
@@ -308,6 +326,24 @@ public sealed record SemanticModel(Tree Tree, DiagnosticBag Diagnostics, SymbolT
 
         var interfaceSymbol = FindDeclarationSymbol<InterfaceSymbol>(interfaceType.Name);
         return interfaceSymbol?.GetPropertiesAtPath(path) ?? [];
+    }
+
+    /// <inheritdoc cref="InterfaceSymbol.GetPropertyChainAtPath" />
+    public IReadOnlyList<PropertySymbol?> GetPropertySymbolChain(Type objectType, IReadOnlyList<string> path)
+    {
+        objectType = objectType.NonNullable();
+        objectType = objectType switch
+        {
+            InstantiatedType instantiated => instantiated.Expand(),
+            GenericType generic => generic.UnderlyingType,
+            _ => objectType
+        };
+
+        if (objectType is not InterfaceType interfaceType)
+            return [];
+
+        var interfaceSymbol = FindDeclarationSymbol<InterfaceSymbol>(interfaceType.Name);
+        return interfaceSymbol?.GetPropertyChainAtPath(path) ?? [];
     }
 
     /// <summary>

@@ -960,10 +960,26 @@ public sealed partial class LuauGenerator
         return WrapWithImplementationMetatable(new Table(fields), interfaceSymbol, interfaceType.Name, withOperator);
     }
 
-    private Luau.AST.PropertyAccess GenerateRenamedAccess(Expression access, LuauExpression target, List<string> names) =>
-        _semanticModel.TryGetIntrinsicAttribute(access, "luau_name", out var attr) && ValidateLuauNameAttribute(attr, out var nameLiteral)
-            ? new Luau.AST.PropertyAccess(target, [..names.SkipLast(1), nameLiteral.Value])
-            : new Luau.AST.PropertyAccess(target, names);
+    /// <summary>
+    ///     Renames every step of the chain that needs it, not just the last - <c>a.b.c</c> can have a
+    ///     <c>luau_name</c> at each step (e.g. <c>frame.absolute_position.x</c> needs both
+    ///     'absolute_position' → 'AbsolutePosition' and 'x' → 'X'), and a step with no attribute keeps its
+    ///     own name unchanged.
+    /// </summary>
+    private Luau.AST.PropertyAccess GenerateRenamedAccess(Expression access, LuauExpression target, List<string> names)
+    {
+        var symbolChain = _semanticModel.GetPropertySymbolChain(access);
+        var renamed = names.Select((name, index) =>
+            index < symbolChain.Count
+            && symbolChain[index] is { } symbol
+            && symbol.TryGetIntrinsicAttribute("luau_name", out var attr)
+            && ValidateLuauNameAttribute(attr, out var nameLiteral)
+                ? nameLiteral.Value
+                : name
+        ).ToList();
+
+        return new Luau.AST.PropertyAccess(target, renamed);
+    }
 
     /// <summary>
     ///     Determines whether the given expression refers to a trait method that must be called

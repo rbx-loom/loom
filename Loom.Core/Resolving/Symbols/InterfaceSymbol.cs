@@ -37,6 +37,28 @@ public sealed class InterfaceSymbol(InterfaceDeclaration declaration, string nam
         return properties is [{ PointsTo: { } pointsTo }, ..] && path.Count > 1 ? pointsTo.GetPropertiesAtPath(path.Skip(1).ToArray()) : properties;
     }
 
+    /// <summary>
+    ///     One property symbol per step of <paramref name="path" />, in declaration order - unlike
+    ///     <see cref="GetPropertiesAtPath" />, which only returns the last step's (overload) symbols. A
+    ///     chained access like <c>a.b.c</c> can need a <c>luau_name</c> rename at every step, not just the
+    ///     last, so a renamer needs each step's own symbol to check. A step whose name resolves to nothing
+    ///     stops the walk early - <c>null</c> for that step and every step after it, since there is no
+    ///     further interface to keep walking into.
+    /// </summary>
+    public List<PropertySymbol?> GetPropertyChainAtPath(IReadOnlyList<string> path)
+    {
+        var chain = new List<PropertySymbol?>(path.Count);
+        InterfaceSymbol? current = this;
+        foreach (var name in path)
+        {
+            var property = current?.FullProperties.FirstOrDefault(p => p.Name == name);
+            chain.Add(property);
+            current = property?.PointsTo;
+        }
+
+        return chain;
+    }
+
     public override string ToString() =>
         $"InterfaceSymbol({Name}, IsSealed: {IsSealed}, Properties: [{string.Join(", ", Properties.Select(s => s.Name))}] Implements: [{string.Join(", ", Implements.Select(s => s.Name))}], Constraints: [{string.Join(", ", Constraints?.Select(s => s.Name) ?? [])}])";
 
