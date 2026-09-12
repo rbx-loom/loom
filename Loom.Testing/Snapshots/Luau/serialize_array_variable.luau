@@ -78,3 +78,4 @@ const function _trigger_usage(): ()
   const payload = Roster_serialize_binary((nil :: never) :: Roster)
   const restored = Roster_deserialize_binary(payload)
 end
+return nil

@@ -81,3 +81,4 @@ const function _trigger_usage(): ()
   const payload = Envelope_serialize_binary((nil :: never) :: Envelope)
   const restored = Envelope_deserialize_binary(payload)
 end
+return nil

@@ -185,6 +185,7 @@ public partial class SourceRootTest
                     const geometry = require("@game/ReplicatedStorage/Shared/packages/geometry")
                     const pi = geometry.pi
                     print(pi)
+                    return nil
 
                     """.Replace(Environment.NewLine, "\n"),
                     result.Files.Single(file => file.SourceFile.Name == "main.loom").RenderedLuau.Replace(Environment.NewLine, "\n")

@@ -45,3 +45,4 @@ for _, _element_1 in xs do
   _result_3[_element_1] = true
 end
 const mixed_members = _result_3
+return nil

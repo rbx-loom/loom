@@ -12,3 +12,4 @@ const v = 420 :: unknown
 if is_number(v) then
   print(v + 69)
 end
+return nil

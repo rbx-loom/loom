@@ -50,3 +50,4 @@ const _length_4 = #names
 table.move(names, 1, _length_4, _count_6 + 1, _result_6)
 _count_6 += _length_4
 const mixed = _result_6
+return nil

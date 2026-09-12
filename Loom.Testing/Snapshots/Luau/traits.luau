@@ -13,3 +13,4 @@ function ToString_for_Person.to_string(self: Person)
 end
 const person = setmetatable({ name = "Runic", age = 21 }, ToString_for_Person) :: Person
 print(person:to_string())
+return nil

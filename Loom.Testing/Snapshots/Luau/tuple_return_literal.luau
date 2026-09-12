@@ -3,3 +3,4 @@ const function returns_tuple(): (string, number)
 end
 const t = returns_tuple()
 print(t)
+return nil

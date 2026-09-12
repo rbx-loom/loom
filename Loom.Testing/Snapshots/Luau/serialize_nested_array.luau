@@ -69,3 +69,4 @@ const function _trigger_usage(): ()
   const payload = Grid_serialize_binary((nil :: never) :: Grid)
   const restored = Grid_deserialize_binary(payload)
 end
+return nil

@@ -12,3 +12,4 @@ bar:do_foo()
 bar.foo:do_foo()
 const baz = (nil :: never) :: Baz
 baz:do_baz(69)
+return nil

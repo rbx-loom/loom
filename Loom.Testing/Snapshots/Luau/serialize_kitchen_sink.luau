@@ -170,3 +170,4 @@ const function _trigger_usage(): ()
   const payload = KitchenSink_serialize_binary((nil :: never) :: KitchenSink)
   const restored = KitchenSink_deserialize_binary(payload)
 end
+return nil

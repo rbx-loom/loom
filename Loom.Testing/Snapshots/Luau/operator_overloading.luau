@@ -15,3 +15,4 @@ const start = setmetatable({ position = 69 }, Add_Location_for_Location) :: Loca
 const finish = setmetatable({ position = 420 }, Add_Location_for_Location) :: Location
 const result1 = start + finish
 const result2 = start:add(finish)
+return nil

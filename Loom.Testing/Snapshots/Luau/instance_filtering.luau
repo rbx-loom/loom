@@ -19,3 +19,4 @@ for _, child in _source_1 do
   _result_1[_count_1] = child
 end
 const descendant_parts = _result_1
+return nil

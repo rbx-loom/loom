@@ -13,3 +13,4 @@ const letter: string = "a"
 const key: "x" | "z" = "x"
 const awaited: number = 7
 print(width, letter, key, awaited, point.x)
+return nil

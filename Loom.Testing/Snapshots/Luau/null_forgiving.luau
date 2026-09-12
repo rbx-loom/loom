@@ -4,3 +4,4 @@ type Player = {
 }
 const player = { health = 100 }
 const health = player.health :: Loom.NonNullable<typeof(player.health)>
+return nil

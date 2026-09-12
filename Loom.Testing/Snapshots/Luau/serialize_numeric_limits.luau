@@ -59,3 +59,4 @@ const function _trigger_usage(): ()
   const payload = Limits_serialize_binary((nil :: never) :: Limits)
   const restored = Limits_deserialize_binary(payload)
 end
+return nil

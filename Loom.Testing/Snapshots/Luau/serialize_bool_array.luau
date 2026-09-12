@@ -40,3 +40,4 @@ const function _trigger_usage(): ()
   const payload = Flags_serialize_binary((nil :: never) :: Flags)
   const restored = Flags_deserialize_binary(payload)
 end
+return nil

@@ -72,3 +72,4 @@ const function _trigger_usage(): ()
   const payload = Cell_serialize_binary((nil :: never) :: Cell)
   const restored = Cell_deserialize_binary(payload)
 end
+return nil

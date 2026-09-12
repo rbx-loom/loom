@@ -8,3 +8,4 @@ GetValue_string_number_for_WithIndexer = GetValue_string_number_for_WithIndexer 
 function GetValue_string_number_for_WithIndexer.get_value(self: WithIndexer, key)
   return self[key]
 end
+return nil

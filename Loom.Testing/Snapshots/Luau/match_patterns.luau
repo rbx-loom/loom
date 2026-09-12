@@ -55,3 +55,4 @@ else
 end
 const firstAndRest = _match
 const onlyWildcard = 42
+return nil

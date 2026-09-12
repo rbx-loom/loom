@@ -23,3 +23,4 @@ end)
 my_event:Fire(69420)
 const conn = my_event:Connect(on_event)
 conn:Disconnect()
+return nil

@@ -7,3 +7,4 @@ type ShapeStatic = {
 }
 const a = Shape.create()
 const b = Shape.create(1, 2)
+return nil

@@ -14,3 +14,4 @@ end
 const entries = {{ key = "pi", value = 3.14159 }, { key = "e", value = 2.71828 }}
 const result = find(entries, "pi")
 print(if result.ok then result.value else result.error)
+return nil

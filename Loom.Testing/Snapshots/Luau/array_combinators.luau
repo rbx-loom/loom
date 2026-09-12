@@ -127,3 +127,4 @@ for _index_2, n in numbers do
   _result_1[_index_2] = n * 2
 end
 const mapped_size = #_result_1
+return nil

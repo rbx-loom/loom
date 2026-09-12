@@ -22,3 +22,4 @@ const function _trigger_usage(): ()
   const payload = Counter_serialize_binary((nil :: never) :: Counter)
   const restored = Counter_deserialize_binary(payload)
 end
+return nil

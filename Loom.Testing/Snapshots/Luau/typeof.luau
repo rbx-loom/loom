@@ -8,3 +8,4 @@ type Foo = {
 const foo = { foo = 69, bar = "hi" }
 type C = typeof(foo)
 const y: typeof(x) = x
+return nil

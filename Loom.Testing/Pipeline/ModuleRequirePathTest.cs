@@ -41,6 +41,7 @@ public class ModuleRequirePathTest
             const geometry = require("@game/ReplicatedStorage/Shared/geometry")
             const square = geometry.square
             print(square(2))
+            return nil
             """
         );
 

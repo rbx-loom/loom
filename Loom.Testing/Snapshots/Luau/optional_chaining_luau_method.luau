@@ -13,3 +13,4 @@ if bar ~= nil then
   end
 end
 const _ = _result
+return nil

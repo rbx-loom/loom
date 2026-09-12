@@ -36,3 +36,4 @@ const function _trigger_usage(): ()
   const payload = Anchor_serialize_binary((nil :: never) :: Anchor)
   const restored = Anchor_deserialize_binary(payload)
 end
+return nil

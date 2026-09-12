@@ -4,3 +4,4 @@ end
 const one, two = returns_tuple()
 print(one)
 print(two)
+return nil

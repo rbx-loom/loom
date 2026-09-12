@@ -9,3 +9,4 @@ const running = true
 Loom.every(1, function()
   return running
 end, print, "tick")
+return nil

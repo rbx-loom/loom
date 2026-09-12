@@ -6,3 +6,4 @@ end
 if part ~= nil then
   const on_touch_conn = part.Touched:Connect(on_touch)
 end
+return nil

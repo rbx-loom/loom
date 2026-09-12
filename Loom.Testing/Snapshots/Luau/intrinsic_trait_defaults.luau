@@ -30,3 +30,4 @@ const b = setmetatable({ name = "Poppy", age = 31 }, User_meta) :: User
 print(a:to_string())
 print(a:equals(b))
 print(a:hash())
+return nil

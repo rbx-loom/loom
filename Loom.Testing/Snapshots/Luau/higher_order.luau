@@ -14,3 +14,4 @@ const function double(n: number)
 end
 print(map(numbers, id))
 print(map(numbers, double))
+return nil

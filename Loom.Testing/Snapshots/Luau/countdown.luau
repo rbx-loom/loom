@@ -8,3 +8,4 @@ const function countdown(n: number): string
   return result .. "Go!"
 end
 print(countdown(10))
+return nil

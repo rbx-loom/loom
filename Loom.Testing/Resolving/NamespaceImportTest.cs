@@ -83,6 +83,7 @@ public class NamespaceImportTest
             const math = require("./math")
             const total = math.square(math.pi)
             print(total)
+            return nil
             """
         );
 
@@ -94,6 +95,7 @@ public class NamespaceImportTest
             const math = require("./math")
             const square = math.square
             print(square(math.pi))
+            return nil
             """
         );
 

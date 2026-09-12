@@ -54,3 +54,4 @@ const function _trigger_usage(): ()
   const payload = Payload_serialize_binary((nil :: never) :: Payload)
   const restored = Payload_deserialize_binary(payload)
 end
+return nil

@@ -40,6 +40,7 @@ public class ModuleEventTest
             const handler = bus.handler
             const _message_connections = bus._message_connections
             _message_connections[handler] = message:Connect(handler)
+            return nil
             """
         );
 
@@ -54,6 +55,7 @@ public class ModuleEventTest
             const handler = bus.handler
             const _message_connections = bus._message_connections
             Loom.disconnect_event(_message_connections, handler)
+            return nil
             """
         );
 
@@ -67,6 +69,7 @@ public class ModuleEventTest
             const _message_connections = bus._message_connections
             _message_connections[bus.handler] = bus.message:Connect(bus.handler)
             Loom.disconnect_event(_message_connections, bus.handler)
+            return nil
             """
         );
 
@@ -99,6 +102,7 @@ public class ModuleEventTest
             const _broadcast_connections = relay._broadcast_connections
             _broadcast_connections[handler] = broadcast:Connect(handler)
             Loom.disconnect_event(_broadcast_connections, handler)
+            return nil
             """
         );
 

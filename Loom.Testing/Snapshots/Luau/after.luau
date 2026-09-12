@@ -4,3 +4,4 @@ task.delay(0.5, function(): ()
   print("epic")
 end)
 task.delay(10, print, "big dawg")
+return nil

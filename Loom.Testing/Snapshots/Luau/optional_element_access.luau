@@ -11,3 +11,4 @@ if _result ~= nil then
   _result_1 = _result[0]
 end
 const x = _result_1
+return nil

@@ -18,3 +18,4 @@ const function stored_unsafe_fn(): Loom.Result<number, string>
   const value = result.value
   return { ok = true, value = 69 + value }
 end
+return nil

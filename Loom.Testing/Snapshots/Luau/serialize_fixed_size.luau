@@ -29,3 +29,4 @@ const function _trigger_usage(): ()
   const payload = MyData_serialize_binary((nil :: never) :: MyData)
   const restored = MyData_deserialize_binary(payload)
 end
+return nil

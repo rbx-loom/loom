@@ -19,3 +19,4 @@ end
 const function descendant(root: Instance): Instance
   return root:WaitForChild("a"):WaitForChild("b")
 end
+return nil

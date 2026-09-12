@@ -4,3 +4,4 @@ const function returns_tuple(): (string, number)
 end
 const result = returns_tuple()
 print(result)
+return nil

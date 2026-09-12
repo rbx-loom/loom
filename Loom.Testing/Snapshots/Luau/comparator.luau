@@ -9,3 +9,4 @@ const function less(a: number, b: number): boolean
 end
 const numbers_comparator = { less = less }
 print(max(5, 8, numbers_comparator))
+return nil

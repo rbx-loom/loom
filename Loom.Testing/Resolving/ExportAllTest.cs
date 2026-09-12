@@ -138,6 +138,7 @@ public class ExportAllTest
                     type Point = index.Point
                     const p: Point = { x = pi, y = pi }
                     print(p)
+                    return nil
                     """
                 );
             }

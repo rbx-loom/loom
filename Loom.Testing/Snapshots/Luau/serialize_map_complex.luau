@@ -150,3 +150,4 @@ const function _trigger_usage(): ()
   const payload = Registry_serialize_binary((nil :: never) :: Registry)
   const restored = Registry_deserialize_binary(payload)
 end
+return nil

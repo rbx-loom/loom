@@ -64,6 +64,9 @@ public class SerializationRuntimeTest
                 .Where(line => !line.StartsWith("export type ", StringComparison.Ordinal))
                 .Where(line => !line.StartsWith("  read ", StringComparison.Ordinal))
                 .Where(line => line.TrimEnd() != "}")
+                // a file with nothing to export still ends in 'return nil' (Compiler.EnsureChunkReturnsAValue),
+                // which can't sit before the assertions spliced on below - Luau requires 'return' to end its block
+                .Where(line => line.Trim() != "return nil")
         );
 
         var prelude = File.ReadAllText(Path.Combine(_runtimeDirectory, "prelude.luau"));

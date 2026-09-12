@@ -114,7 +114,29 @@ public sealed class Compiler(CompilationUnit unit, SourceFile file)
             return null;
 
         var generator = new LuauGenerator(semanticModel, unit.RuntimeImport, unit.ModuleRequirePaths, typeCheckerDiagnostics);
-        return TrackDiagnostics(generator.Generate());
+        var result = TrackDiagnostics(generator.Generate());
+        EnsureChunkReturnsAValue(result.LuauTree);
+        return result;
+    }
+
+    /// <summary>
+    ///     A Luau chunk that is ever <c>require()</c>d must return exactly one value - Roblox raises "Module
+    ///     code did not return exactly one value" otherwise. <see cref="LuauGenerator" /> already ends a file
+    ///     with a <c>return</c> of its exports when it has any; a file with nothing to export (type/enum-only,
+    ///     or simply empty) would otherwise compile with no return at all. Whether Rojo turns this particular
+    ///     file into a ModuleScript (`require`d) or a Script/LocalScript (run directly, return value ignored)
+    ///     is a filename convention this compiler has no visibility into, so the safe answer covers both: a
+    ///     trailing `return nil` costs nothing where it's unread and fixes the crash where it would be.
+    ///     Applied only here rather than inside <see cref="LuauGenerator" /> itself, so the many tests exercising
+    ///     <see cref="LuauGenerator.Generate" /> directly on an isolated snippet keep seeing exactly the
+    ///     statements their source produced.
+    /// </summary>
+    private static void EnsureChunkReturnsAValue(LuauTree tree)
+    {
+        if (tree.Statements is [.., Return])
+            return;
+
+        tree.Statements.Add(new Return(new NilLiteral()));
     }
 
     /// <remarks>

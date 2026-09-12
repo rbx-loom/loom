@@ -3,3 +3,4 @@ type Foo = {
 }
 const foo = { bar = "abc" }
 print(foo.bar ~= nil)
+return nil

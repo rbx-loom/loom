@@ -7,3 +7,4 @@ const my_conn = abc:Connect(handler)
 my_conn:Disconnect()
 const handler_conn = abc:Connect(handler)
 handler_conn:Disconnect()
+return nil

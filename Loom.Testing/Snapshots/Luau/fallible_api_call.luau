@@ -15,3 +15,4 @@ const function load(key: string): Loom.Result<unknown, Loom.RobloxError>
 end
 const outcome = Loom.future(load, "player_1")
 print(outcome.status)
+return nil

@@ -14,3 +14,4 @@ for _, obj in collection_service:GetTagged("Lava") do
     return _result_1
   end)
 end
+return nil

@@ -688,3 +688,4 @@ const function _trigger_usage(): ()
   const diff = PlayerState_diff_binary((nil :: never) :: PlayerState, (nil :: never) :: PlayerState)
   const applied = PlayerState_apply_diff_binary((nil :: never) :: PlayerState, diff)
 end
+return nil

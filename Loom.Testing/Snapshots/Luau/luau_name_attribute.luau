@@ -7,3 +7,4 @@ const foo = { SuperGoob = goober, DoFoo = nil :: never }
 const _ = foo.SuperGoob
 foo:DoFoo()
 foo:DoFoo()
+return nil

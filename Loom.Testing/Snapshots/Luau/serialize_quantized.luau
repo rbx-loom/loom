@@ -26,3 +26,4 @@ const function _trigger_usage(): ()
   const payload = Dials_serialize_binary((nil :: never) :: Dials)
   const restored = Dials_deserialize_binary(payload)
 end
+return nil

@@ -122,3 +122,4 @@ const function _trigger_usage(): ()
   const account_payload = Account_serialize_binary((nil :: never) :: Account)
   const account_restored = Account_deserialize_binary(account_payload)
 end
+return nil

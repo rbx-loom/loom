@@ -5,3 +5,4 @@ const function handler(data: string): ()
 end
 const handler_conn = my_event:Once(handler)
 my_event:Fire("hello!")
+return nil

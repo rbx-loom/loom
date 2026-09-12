@@ -58,3 +58,4 @@ const function _trigger_usage(): ()
   const payload = Waypoint_serialize_binary((nil :: never) :: Waypoint)
   const restored = Waypoint_deserialize_binary(payload)
 end
+return nil

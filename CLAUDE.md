@@ -246,6 +246,17 @@ AND generator — not just parse + emit (see CONTRIBUTING.md).
   warnings and info and collapses errors into one `PackageFailedToCompile` per file carrying the first underlying error. `DiagnosticOptions
   .ReportDependencyDiagnostics` (CLI: `--dependency-diagnostics`) turns that off for debugging a package from a project consuming it. Opening a package's own
   files in the LSP needs no flag — the package is the entry root of its own unit there.
+- Every compiled file ends with a `return` now, even one with nothing to export — `Compiler.EnsureChunkReturnsAValue`
+  appends `return nil` when `LuauGenerator` didn't already end the tree with its own `return` of the file's exports.
+  A ModuleScript with no runtime value to export (type/enum-only, or simply empty) used to compile with no `return`
+  at all, which is only harmless for a Script/LocalScript — Roblox's `require()` raises "Module code did not return
+  exactly one value" the moment anything actually imports one as a module. Deliberately *not* in `LuauGenerator`
+  itself: hundreds of `Generation` tests call `LuauGenerator.Generate()` directly on an isolated snippet and assert
+  on its exact statement list, so the padding return is appended one layer up, in the one place that's actually
+  building output meant to be `require()`d. A round-trip `Runtime/*.luau` test that splices more code after the
+  emitted body (`SerializationRuntimeTest`, `FutureRuntimeTest`, `SpreadRuntimeTest`) has to filter a bare
+  `return nil` line back out first — Luau requires `return` to be the last statement of its block, same reason
+  `FutureRuntimeTest` already dropped `loom_runtime.luau`'s own `return Loom` before splicing.
 - A chained intrinsic access used to only rename its *last* step: `frame.absolute_position.y` compiled to
   `frame.absolute_position.Y` instead of `frame.AbsolutePosition.Y` — `GenerateRenamedAccess` read one `luau_name`
   attribute off the whole access expression (which `SemanticModel.GetPropertySymbol` resolves to the *final* step's

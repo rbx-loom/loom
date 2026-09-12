@@ -58,3 +58,4 @@ const function _trigger_usage(): ()
   const payload = Scores_serialize_binary((nil :: never) :: Scores)
   const restored = Scores_deserialize_binary(payload)
 end
+return nil

@@ -6,3 +6,4 @@ if second == nil then
 end
 print(first)
 print(second)
+return nil

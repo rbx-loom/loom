@@ -21,3 +21,4 @@ const a = setmetatable({ name = "Poppy", age = 31 }, User_meta) :: User
 const b = setmetatable({ name = "Rose", age = 20 }, User_meta) :: User
 print(a:to_string())
 print(a:equals(b))
+return nil

@@ -7,3 +7,4 @@ const name = user.name
 const age = user.age
 print(name)
 print(age)
+return nil

@@ -257,3 +257,4 @@ const function _trigger_usage(): ()
   const compositions_payload = Compositions_serialize_binary((nil :: never) :: Compositions)
   const compositions_restored = Compositions_deserialize_binary(compositions_payload)
 end
+return nil

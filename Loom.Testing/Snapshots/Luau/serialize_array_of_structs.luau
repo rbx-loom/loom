@@ -101,3 +101,4 @@ const function _trigger_usage(): ()
   const branch_payload = Branch_serialize_binary((nil :: never) :: Branch)
   const branch_restored = Branch_deserialize_binary(branch_payload)
 end
+return nil

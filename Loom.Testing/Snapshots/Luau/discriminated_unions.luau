@@ -19,3 +19,4 @@ elseif a.kind == "Click" then
 elseif "LogOut" == "LogOut" then
   print(a)
 end
+return nil

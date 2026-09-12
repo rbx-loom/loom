@@ -74,3 +74,4 @@ const function _trigger_usage(): ()
   const payload = Entity_serialize_binary((nil :: never) :: Entity)
   const restored = Entity_deserialize_binary(payload)
 end
+return nil

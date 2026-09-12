@@ -78,9 +78,13 @@ public class FutureRuntimeTest
                 .Where(line => line.Trim() != "return Loom")
         );
 
+        // a file with nothing to export still ends in 'return nil' (see Compiler.EnsureChunkReturnsAValue) - same
+        // "return must be last in a block" problem as the runtime's own 'return Loom' above, so it's dropped too.
         var body = string.Join(
             '\n',
-            emitted.Split('\n').Where(line => !line.Contains("require(", StringComparison.Ordinal))
+            emitted.Split('\n')
+                .Where(line => !line.Contains("require(", StringComparison.Ordinal))
+                .Where(line => line.Trim() != "return nil")
         );
 
         return $"""

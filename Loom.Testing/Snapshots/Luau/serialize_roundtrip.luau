@@ -24,3 +24,4 @@ const restored = MyData_deserialize_binary(payload)
 if restored.ok then
   print(restored.value.id)
 end
+return nil

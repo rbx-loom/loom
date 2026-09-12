@@ -10,3 +10,4 @@ const on_consumer_conn = eo.ConsumerEvent:Connect(on_consumer)
 eo.ConsumerEvent:Fire("abc")
 on_consumer_conn:Disconnect()
 const my_event: Loom.Event<string> = Loom.Event.new()
+return nil

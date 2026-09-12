@@ -12,3 +12,4 @@ const function total(items: { Item }): number
 end
 const items = {{ name = "Keyboard", price = 80, quantity = 2 }, { name = "Mouse", price = 25, quantity = 4 }, { name = "Monitor", price = 300, quantity = 1 }}
 print(total(items))
+return nil

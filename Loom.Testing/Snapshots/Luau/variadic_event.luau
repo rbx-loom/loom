@@ -10,3 +10,4 @@ end)
 const ns = {1, 2}
 abc:Fire(1, "two", true)
 labelled:Fire("hi", table.unpack(ns))
+return nil

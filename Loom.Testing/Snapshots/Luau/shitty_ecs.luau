@@ -46,3 +46,4 @@ end
 const world = setmetatable({ component_storage = {} }, World_for_WorldData) :: WorldData
 const player = world:spawn({{ name = "Position", x = 69, y = 420 }})
 print(world:query(player, "Position"))
+return nil

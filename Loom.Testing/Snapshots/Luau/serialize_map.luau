@@ -79,3 +79,4 @@ type MessageData = { read [number]: ShootGunPacket }
 const function create_message_serializer<K>(message: K & Message): Loom.Serializer<index<MessageData, K & Message>>
   return MessageData_serializer_map[message]
 end
+return nil

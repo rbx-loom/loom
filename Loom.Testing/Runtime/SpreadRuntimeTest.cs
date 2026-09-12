@@ -42,21 +42,27 @@ public class SpreadRuntimeTest
     ///     Loom spells an immutable binding <c>const</c>, which Luau has no keyword for, so it is rewritten
     ///     rather than worked around - what a spread builds does not depend on how the binding was spelled.
     /// </remarks>
-    private static string Assemble(string emitted, string assertions) =>
-        $"""
-          local function same(actual, expected)
-            if #actual ~= #expected then
-              error("length " .. #actual .. ", expected " .. #expected)
-            end
-            for index, value in expected do
-              if actual[index] ~= value then
-                error("[" .. index .. "] is " .. tostring(actual[index]) .. ", expected " .. tostring(value))
-              end
-            end
-          end
-          -- emitted
-          {emitted.Replace("const ", "local ")}
-          -- assertions
-          {assertions}
-          """;
+    private static string Assemble(string emitted, string assertions)
+    {
+        // a file with nothing to export still ends in 'return nil' (Compiler.EnsureChunkReturnsAValue), which
+        // can't sit before the assertions spliced on below - Luau requires 'return' to end its block.
+        var body = string.Join('\n', emitted.Split('\n').Where(line => line.Trim() != "return nil"));
+
+        return $"""
+                  local function same(actual, expected)
+                    if #actual ~= #expected then
+                      error("length " .. #actual .. ", expected " .. #expected)
+                    end
+                    for index, value in expected do
+                      if actual[index] ~= value then
+                        error("[" .. index .. "] is " .. tostring(actual[index]) .. ", expected " .. tostring(value))
+                      end
+                    end
+                  end
+                  -- emitted
+                  {body.Replace("const ", "local ")}
+                  -- assertions
+                  {assertions}
+                  """;
+    }
 }

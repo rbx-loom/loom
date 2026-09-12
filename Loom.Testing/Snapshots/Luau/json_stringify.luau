@@ -8,3 +8,4 @@ const function stringify(user: JsonUser): string
 end
 const user = { name = "Alice", age = 20, tags = {"admin", "staff"} }
 print(stringify(user))
+return nil

@@ -7,3 +7,4 @@ const function factorial(n: number): number
 end
 const result = factorial(5)
 print(result)
+return nil

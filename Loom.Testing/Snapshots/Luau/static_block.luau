@@ -9,3 +9,4 @@ function Vector2.create(x, y)
 end
 const v = Vector2.create(1, 2)
 const z = Vector2.zero
+return nil

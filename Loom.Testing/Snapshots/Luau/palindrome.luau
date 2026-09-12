@@ -9,3 +9,4 @@ const function is_palindrome(original: number): boolean
 end
 print(is_palindrome(69))
 print(is_palindrome(1991))
+return nil

@@ -124,3 +124,4 @@ const function _trigger_usage(): ()
   const payload = Canvas_serialize_binary((nil :: never) :: Canvas)
   const restored = Canvas_deserialize_binary(payload)
 end
+return nil

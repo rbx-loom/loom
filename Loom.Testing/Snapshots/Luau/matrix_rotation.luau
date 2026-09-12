@@ -4,3 +4,4 @@ const function rotate(matrix: Matrix): Matrix
 end
 const matrix = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
 print(rotate(matrix))
+return nil

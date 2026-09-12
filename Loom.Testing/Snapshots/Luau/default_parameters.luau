@@ -4,3 +4,4 @@ const function abc(param)
   end
   return print(param)
 end
+return nil

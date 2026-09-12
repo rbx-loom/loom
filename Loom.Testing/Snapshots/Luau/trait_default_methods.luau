@@ -20,3 +20,4 @@ const a = setmetatable({}, Greeting_for_A) :: A
 const b = setmetatable({}, Greeting_for_B) :: B
 print(a:greet())
 print(b:greet())
+return nil

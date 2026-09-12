@@ -282,3 +282,4 @@ const function _trigger_usage(): ()
   const payload = PlayerSnapshot_serialize_binary((nil :: never) :: PlayerSnapshot)
   const restored = PlayerSnapshot_deserialize_binary(payload)
 end
+return nil

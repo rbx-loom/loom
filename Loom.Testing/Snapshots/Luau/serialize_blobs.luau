@@ -28,3 +28,4 @@ const function _trigger_usage(): ()
   const payload = Marker_serialize_binary((nil :: never) :: Marker)
   const restored = Marker_deserialize_binary(payload)
 end
+return nil

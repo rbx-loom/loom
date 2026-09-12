@@ -47,13 +47,16 @@ public partial class CompilationUnitTest
         Assert.IsType<BinaryOperator>(Assert.IsType<ExpressionStatement>(file.Tree.Statements.First()).Expression);
         Assert.Null(file.SemanticModel.GetSymbol(file.Tree));
         Assert.Equal(PrimitiveType.Number, file.ReturnType);
-        Assert.Single(file.LuauTree.Statements);
+        Assert.Equal(2, file.LuauTree.Statements.Count);
 
-        var variable = Assert.IsType<ConstVariable>(file.LuauTree.Statements.First());
+        var variable = Assert.IsType<ConstVariable>(file.LuauTree.Statements[0]);
         var binary = Assert.IsType<Luau.AST.BinaryOperator>(variable.Initializer);
         Assert.Equal("_", variable.Name);
         Assert.IsType<NumberLiteral>(binary.Left);
         Assert.IsType<NumberLiteral>(binary.Right);
+
+        var returnStatement = Assert.IsType<Return>(file.LuauTree.Statements[1]);
+        Assert.IsType<NilLiteral>(returnStatement.Expression);
 
         var path = config.Files.OutputDirectory;
         Directory.Delete(path, true);

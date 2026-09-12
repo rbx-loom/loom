@@ -23,6 +23,7 @@ public class ImportGeneratorTest
             const square = geometry.square
             const pi = geometry.pi
             print(square(pi))
+            return nil
             """
         );
 
@@ -34,6 +35,7 @@ public class ImportGeneratorTest
             const geometry = require("./geometry")
             const PI = geometry.pi
             print(PI)
+            return nil
             """
         );
 
@@ -46,6 +48,7 @@ public class ImportGeneratorTest
             type Scalar = geometry.Scalar
             const total: Scalar = 1
             print(total)
+            return nil
             """
         );
 
@@ -58,6 +61,7 @@ public class ImportGeneratorTest
             type Box<T> = geometry.Box<T>
             const items: Box<number> = {1}
             print(items)
+            return nil
             """
         );
 
@@ -70,6 +74,7 @@ public class ImportGeneratorTest
             type Color = geometry.Color
             const c: Color = 2
             print(c)
+            return nil
             """
         );
 
@@ -82,6 +87,7 @@ public class ImportGeneratorTest
             type Point = geometry.Point
             const p: Point = { x = 1, y = 2 }
             print(p.x)
+            return nil
             """
         );
 
@@ -100,6 +106,7 @@ public class ImportGeneratorTest
             type Scalar = geometry.Scalar
             const total: Scalar = pi
             print(total)
+            return nil
             """
         );
 
@@ -112,6 +119,7 @@ public class ImportGeneratorTest
             const pi = geometry_1.pi
             const geometry = 1
             print(geometry, pi)
+            return nil
             """
         );
 
@@ -125,6 +133,7 @@ public class ImportGeneratorTest
             const pi = geometry.pi
             const tick: Loom.Event = Loom.Event.new()
             print(pi)
+            return nil
             """
         );
 
@@ -138,6 +147,7 @@ public class ImportGeneratorTest
                 const util = require("./util")
                 const helper = util.helper
                 print(helper)
+                return nil
                 """
             )
         );
@@ -160,6 +170,7 @@ public class ImportGeneratorTest
                 const zero = util_vector.zero
                 const vector = 1
                 print(zero, vector)
+                return nil
                 """
             )
         );
