@@ -90,6 +90,20 @@ public class FileManagerTest
             }
         );
 
+    [Theory]
+    [InlineData(ProjectType.Game, true)]
+    [InlineData(ProjectType.Plugin, true)]
+    [InlineData(ProjectType.Library, false)]
+    public void WriteIncludeFolder_WritesOnlyForProjectTypesThatRunTheRuntime(ProjectType projectType, bool written) =>
+        WithTempDirectory(directory =>
+            {
+                var config = new LoomConfig { ProjectDirectory = directory, ProjectType = projectType };
+
+                Assert.Equal(written, FileManager.WriteIncludeFolder(config));
+                Assert.Equal(written, Directory.Exists(Path.Combine(directory, FileManager.IncludeFolderName)));
+            }
+        );
+
     [Fact]
     public void WriteCompiledFile_SkipsWrite_WhenContentUnchanged() =>
         Utility.WithTempProject(
