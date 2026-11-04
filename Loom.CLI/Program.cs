@@ -39,7 +39,7 @@ static int compile(string directory, bool dependencyDiagnostics, bool watch)
     if (!Projects.TryLocate(directory, out var config))
         return 1;
 
-    FileManager.WriteIncludeFolder(config.ProjectDirectory);
+    FileManager.WriteIncludeFolder(config);
     if (!watch)
     {
         if (!PackageManager.Restore(config, out var restoreDiagnostics))

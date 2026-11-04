@@ -9,10 +9,27 @@ public static class FileManager
     public const string LoomExtension = ".loom";
     public const string DeclarationExtension = ".d.loom";
     private const string LuauExtension = ".luau";
-    private const string IncludeFolderName = "include";
+    public const string IncludeFolderName = "include";
     private const string IncludeResourcePrefix = "Include/";
 
     private static readonly Assembly _resourceAssembly = typeof(FileManager).Assembly;
+
+    /// <summary>
+    ///     Whether a project of this type gets an include folder. A library's output runs against the runtime of
+    ///     whichever project consumes it, so one of its own would only ever be dead weight in the package.
+    /// </summary>
+    public static bool HasIncludeFolder(ProjectType projectType) => projectType != ProjectType.Library;
+
+    /// <summary>Writes the include folder for <paramref name="config" />'s project, unless its type has none.</summary>
+    /// <returns>Whether the folder was written.</returns>
+    public static bool WriteIncludeFolder(LoomConfig config)
+    {
+        if (!HasIncludeFolder(config.ProjectType))
+            return false;
+
+        WriteIncludeFolder(config.ProjectDirectory);
+        return true;
+    }
 
     /// <summary>
     ///     Writes the bundled Luau runtime support into the project's include folder, overwriting whatever is
