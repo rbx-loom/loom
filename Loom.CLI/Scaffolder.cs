@@ -80,10 +80,15 @@ internal static class Scaffolder
             filesWritten.Add("src/main.loom");
         }
 
-        // packages are installed by a package manager and pinned by loom-lock.toml, which is committed instead
+        // packages are installed by a package manager and pinned by loom-lock.toml, which is committed instead;
+        // the include folder is rewritten from the compiler on every build
+        var ignored = new List<string> { "dist/", FilesConfig.PackagesDirectoryName + "/" };
+        if (FileManager.HasIncludeFolder(projectType))
+            ignored.Add(FileManager.IncludeFolderName + "/");
+
         File.WriteAllText(
             Path.Combine(projectDirectory, ".gitignore"),
-            "dist/" + Environment.NewLine + FilesConfig.PackagesDirectoryName + "/" + Environment.NewLine
+            string.Concat(ignored.Select(entry => entry + Environment.NewLine))
         );
         Log.Info($"Wrote {string.Join(", ", filesWritten.SkipLast(1).Select(colorFileName))}, and {colorFileName(filesWritten.Last())}.");
 
