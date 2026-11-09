@@ -630,11 +630,9 @@ public sealed partial class LuauGenerator
         if (parameters == null)
             return argumentList.ConvertAll(argument => Visit<LuauExpression>(argument is NamedArgument named ? named.Value : argument));
 
-        var fixedParameters = parameters.ParameterList is [.., { DotDot: not null }]
-            ? parameters.ParameterList.GetRange(0, parameters.ParameterList.Count - 1)
-            : parameters.ParameterList;
-
+        var fixedParameters = TypeChecking.InvocationArguments.FixedParameters(parameters);
         var slots = new LuauExpression?[fixedParameters.Count];
+        var sourceOrder = new List<(int Slot, Expression Value)>();
         var positionalCount = 0;
         foreach (var argument in argumentList)
         {
@@ -642,15 +640,25 @@ public sealed partial class LuauGenerator
             {
                 var index = fixedParameters.FindIndex(p => p.Name.Text == namedArgument.Name.Text);
                 if (index >= 0)
-                    slots[index] = Visit<LuauExpression>(namedArgument.Value);
+                    sourceOrder.Add((index, namedArgument.Value));
 
                 continue;
             }
 
             if (positionalCount < slots.Length)
-                slots[positionalCount] = Visit<LuauExpression>(argument);
+                sourceOrder.Add((positionalCount, argument));
 
             positionalCount++;
+        }
+
+        var reordered = sourceOrder.Zip(sourceOrder.Skip(1)).Any(pair => pair.Second.Slot < pair.First.Slot);
+        foreach (var (slot, value) in sourceOrder)
+        {
+            var lowered = Visit<LuauExpression>(value);
+
+            // The call evaluates its arguments left to right in declared order, so a call that names them out of
+            // order would otherwise run them out of the order they were written in.
+            slots[slot] = reordered ? _state.PushIfRepeated(ArrayLowering.ArgumentName, lowered) : lowered;
         }
 
         var lastSupplied = Array.FindLastIndex(slots, slot => slot != null);
