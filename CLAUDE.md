@@ -139,7 +139,7 @@ before claiming done.
   be fixed by publishing the next version, but source that does not compile is in the index for good — `--allow-dirty` skips that check for a publisher who
   knows something this machine does not, and says so on the way past. `add` is the one verb whose positionals are not the
   project directory (they are the packages to add), so it takes `--project` instead.
-  `Include/loom_runtime.luau` = runtime support emitted alongside output. A watch restarts on `loom-config.toml`, the Rojo project *or* `loom-lock.toml` — a
+  `Include/loom_runtime.luau` = runtime support written to the project's `include/` folder on every build (`FileManager.WriteIncludeFolder`); a `library` project gets none (`FileManager.HasIncludeFolder`) since its output runs against its consumer's runtime, and the scaffolder `.gitignore`s the folder for every other type. A watch restarts on `loom-config.toml`, the Rojo project *or* `loom-lock.toml` — a
   package manager installing a dependency changes which projects the unit spans and a unit already built cannot grow a root; renames count too, since
   installing atomically is a write to a temporary file followed by one
 - `Loom.LanguageServer/` — LSP server (OmniSharp). One handler per request, all registered in `Program.cs`, all answering off the `DocumentStore`:

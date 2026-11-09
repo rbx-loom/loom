@@ -56,7 +56,13 @@ before claiming done.
     - `Modules/` — import/export graphing, resolution, and Luau require() path resolution. A relative specifier
       resolves inside the importing file's own root; a bare one (`math`, `scope/math`, `math/vector`) names the root
       publishing that package — its `init.loom` when no subpath follows — and only a package the importing root
-      declares in `[dependencies]` is importable
+      declares in `[dependencies]` is importable. A folder folds into whichever index file it has (`ModuleResolver
+      .IndexFileName`/`.SecondaryIndexFileName`) — `init.loom`, mirroring Rojo's own folding, or `main.loom` for a
+      package authored without Rojo's convention in mind; `init` wins where a folder has both. Luau's own
+      require-by-string resolver only knows how to fold `init` on its own, so a fallback require (no Rojo project to
+      say where the output landed) that reached a module through a `main` fold has to name the file outright —
+      `ModuleResolver.LiteralRequirePath`/`.FoldedThroughSecondaryIndex`, used only by `ModuleRequirePathResolver`'s
+      fallback branch, everything else still resolves by specifier text alone
     - `Diagnostics/` — `DiagnosticBag`, severities, `InternalCodes.cs`. Errors flow through diagnostics, never exceptions (top-level `Compiler.Compile` catch =
       compiler bug path).
     - `Pipeline/` — `Compiler.cs` pipeline orchestration; `CompilationUnit.cs` multi-file compile with a two-phase parse-analyze step to support modules.
@@ -102,7 +108,12 @@ before claiming done.
   is written from the first: an index is as legitimately a directory — vendored, or a test's fixtures — as it is a URL, so neither asks for a URL
 - `Loom.Packages/` — the package manager: the tool side of the line the compiler draws. `IPackageIndex` is all resolution needs from the outside world
   (what is published, and how to install it), so `LocalPackageIndex` — a directory of `<index>/<scope>/<name>/<version>`, each version a Loom project of
-  its own — is a whole offline registry and the fixture every test resolves against; a network index implements the same interface later.
+  its own — is a whole offline registry and the fixture every test resolves against; a network index implements the same interface later. Every member
+  reports through `ConfigDiagnostic`s rather than by throwing, `Publications` included: an empty result is the one answer meaning *no such package*, so an
+  index that could not say has to say so — a failure read as an empty result sends somebody whose network is down looking for a package that exists.
+  `PublishedPackage.Yanked` is the other thing only a registry can state, and its whole point is the asymmetry: `LockResolver.Choose` and `PackageAdder`
+  pass over a yanked version because both are choosing anew, while a version a lock already pins is kept and `PackageInstaller` installs it without asking
+  — a yank withdraws a version from being taken up, and a build already on it is precisely what it is not trying to break.
   `LockResolver` turns requirements plus an index into a `LockFile`: every requirement on a package intersects into the one interval a
   `VersionRequirement` already is, so combining dependents needs no search and the newest published version inside that interval is the answer. It
   deliberately does *not* backtrack — if the newest version one package allows leaves another unsatisfiable, that is reported as a conflict naming both
@@ -128,7 +139,7 @@ before claiming done.
   be fixed by publishing the next version, but source that does not compile is in the index for good — `--allow-dirty` skips that check for a publisher who
   knows something this machine does not, and says so on the way past. `add` is the one verb whose positionals are not the
   project directory (they are the packages to add), so it takes `--project` instead.
-  `Include/loom_runtime.luau` = runtime support emitted alongside output. A watch restarts on `loom-config.toml`, the Rojo project *or* `loom-lock.toml` — a
+  `Include/loom_runtime.luau` = runtime support written to the project's `include/` folder on every build (`FileManager.WriteIncludeFolder`); a `library` project gets none (`FileManager.HasIncludeFolder`) since its output runs against its consumer's runtime, and the scaffolder `.gitignore`s the folder for every other type. A watch restarts on `loom-config.toml`, the Rojo project *or* `loom-lock.toml` — a
   package manager installing a dependency changes which projects the unit spans and a unit already built cannot grow a root; renames count too, since
   installing atomically is a write to a temporary file followed by one
 - `Loom.LanguageServer/` — LSP server (OmniSharp). One handler per request, all registered in `Program.cs`, all answering off the `DocumentStore`:
@@ -175,16 +186,33 @@ AND generator — not just parse + emit (see CONTRIBUTING.md).
 
 ## Tests
 
-- Framework: xUnit + coverlet. Shared helpers in [Utility.cs](Loom.Testing/Utility.cs).
+- Framework: xUnit + coverlet. Shared helpers in [Utility.cs](Loom.Testing/Utility.cs), split into one partial file per pipeline stage it wraps
+  (`Utility.Lexing.cs`, `.Parsing.cs`, `.Resolving.cs`, `.FlowAnalysis.cs`, `.TypeChecking.cs`, `.Generation.cs`) plus the cross-cutting `.Assertions.cs`,
+  `.Projects.cs` (temp-project/`CompilationUnit` scaffolding), and `.LanguageServer.cs` (document-store scaffolding) — add a new helper to whichever file
+  already matches its concern.
+- Layout mirrors `Loom.Core`'s own folders — `Lexing/`, `Parsing/`, `Resolving/`, `FlowAnalysis/`, `TypeChecking/`, `Generation/`, `Modules/`,
+  `Diagnostics/`, `Pipeline/` — plus `Config/`, `Packages/`, `LanguageServer/` for the pieces outside the compiler proper, and `Runtime/` (below). A test
+  class's folder follows what it actually exercises (its `using`s), not what its name suggests. `Assembly.cs` and `Utility*.cs` stay at the root since
+  every folder's tests depend on them.
 - Snapshot tests: `Loom.Testing/Snapshots/AST/*.loom` + `.ast` pairs (parser), `Snapshots/Luau/*.loom` + `.luau` pairs (full-pipeline codegen). Adding a
   language feature usually adds a snapshot pair. Regenerate AST snapshots with Loom.Tools.
 - Per-stage expectations (from CONTRIBUTING.md): parser — valid parses/invalid errors/AST shape; resolver — symbols declared, scope rules; type checker —
   inference, assignability, and for new types test `Equals`, `IsAssignableTo`, `ToString`; codegen — Luau AST correct, rendering valid, edge cases (escaping,
   empty collections).
 - Round-trip tests: `Loom.Testing/Runtime/*.luau` assertion bodies pair by name with a `Snapshots/Luau` case and actually *execute* the emitted serializers
-  on an embedded Luau ([SerializationRuntimeTest.cs](Loom.Testing/SerializationRuntimeTest.cs)). Snapshots only prove the output did not change; these prove it
+  on an embedded Luau — the C# test class asserting on each pair lives alongside the `.luau` files in that same folder (e.g.
+  [Runtime/SerializationRuntimeTest.cs](Loom.Testing/Runtime/SerializationRuntimeTest.cs)). Snapshots only prove the output did not change; these prove it
   works, and caught several bugs snapshots could not (wrong value shape, a shadowed local, an undersized buffer). The interpreter comes from the `NuLua.Luau`
   package, so they need nothing installed and run under a plain `dotnet test`.
+- A test class that outgrows one file splits into partials the same way a `Loom.Core` stage does (see Conventions below) — `TypeCheckerTest`,
+  `ResolverTest`, `ParserTest`, `SerializationSchemaTest`, `CompilationUnitTest`, and `SourceRootTest` are already split this way, one file per region of
+  cases (`TypeCheckerTest.Match.cs`, `ResolverTest.Destructuring.cs`, ...). A class small enough to read in one sitting stays as one file - splitting is
+  for navigability once it isn't, not a rule to apply preemptively.
+- Conformance tests: `Loom.Testing/Conformance/semver.json` and `package-name.json` are checked in here *and* in `rbx-loom/loom-pm`, and both test suites
+  execute them — Loom's requirements are not ordinary semver (one interval and no `||`, unsatisfiable is a parse error, a pre-release needs a bound naming
+  one of the same release), so no off-the-shelf library agrees with either side and only each other keeps the registry and the compiler honest. C# is the
+  reference implementation: when the two disagree C# is right, unless the disagreement is a bug here — in which case fix it here and add the case. Grow the
+  files from bugs; a change to either copy belongs in both repositories.
 
 ## Conventions
 
