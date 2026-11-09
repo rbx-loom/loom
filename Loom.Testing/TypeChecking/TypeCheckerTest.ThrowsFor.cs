@@ -2057,6 +2057,31 @@ public partial class TypeCheckerTest
     }
 
     [Fact]
+    public void ThrowsFor_StaticBlock_RepeatedField()
+    {
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(
+            """
+            interface Vector2 {
+                static zero: Vector2
+                x: number
+            }
+
+            static Vector2 {
+                zero = new Vector2 { x: 0 };
+                zero = new Vector2 { x: 1 };
+            }
+            """
+        );
+
+        Utility.AssertDiagnostic(
+            diagnostics,
+            InternalCodes.DuplicateStaticMember,
+            "Static member 'zero' is already defined in this block.",
+            "remove one of them"
+        );
+    }
+
+    [Fact]
     public void ThrowsFor_StaticBlock_ExtraMember()
     {
         var diagnostics = Utility.GetTypeCheckerDiagnostics(

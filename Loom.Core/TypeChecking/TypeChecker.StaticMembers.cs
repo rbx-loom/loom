@@ -35,6 +35,8 @@ public sealed partial class TypeChecker
             .Where(property => property.IsStatic)
             .ToDictionary(property => property.Name);
 
+        CheckDuplicateStaticMembers(staticBlock.Body);
+
         var providedNames = new HashSet<string>();
         foreach (var field in staticBlock.Body.Fields)
             CheckStaticField(field, nonGenericInterfaceType, staticProperties, providedNames);
@@ -50,6 +52,32 @@ public sealed partial class TypeChecker
             );
 
         return BindType(staticBlock, nonGenericInterfaceType);
+    }
+
+    /// <summary>
+    ///     Reports a static member given a value twice. Two methods of one name are already the resolver's
+    ///     ('already declared'), because a method is a variable in the block's scope - a field is not, so a
+    ///     repeated field, or a method sharing a field's name, would otherwise emit both assignments and
+    ///     leave the later one silently winning.
+    /// </summary>
+    private void CheckDuplicateStaticMembers(StaticBlockBody body)
+    {
+        var fieldNames = new HashSet<string>();
+        foreach (var field in body.Fields.Where(field => !fieldNames.Add(field.Name.Text)))
+            _diagnostics.Error(
+                field,
+                InternalCodes.DuplicateStaticMember,
+                $"Static member '{field.Name.Text}' is already defined in this block.",
+                "remove one of them"
+            );
+
+        foreach (var method in body.Methods.Where(method => fieldNames.Contains(method.Name.Text)))
+            _diagnostics.Error(
+                method,
+                InternalCodes.DuplicateStaticMember,
+                $"Static member '{method.Name.Text}' is already defined in this block.",
+                "remove one of them"
+            );
     }
 
     private void CheckStaticField(
