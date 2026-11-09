@@ -773,7 +773,7 @@ public sealed partial class LuauGenerator
 
         var conditions = new List<LuauExpression>();
         var bindings = new List<LuauStatement>();
-        TryCompilePattern(@is.Pattern, subject, conditions, bindings, out _);
+        CompilePattern(@is.Pattern, subject, conditions, bindings);
 
         var prelude = new List<LuauStatement>();
         if (@is is { Expression: AssignmentTarget, Pattern: TypePattern typePattern })

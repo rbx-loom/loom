@@ -238,7 +238,7 @@ public sealed partial class TypeChecker
     ///     plain expression gets, so an unknown enum or an unknown member is already reported by the time
     ///     this runs. What is new here is requiring the answer be a compile-time constant: pattern
     ///     matching compiles to an equality comparison against a literal value (see
-    ///     <c>LuauGenerator.TryCompilePattern</c>), which nothing else here promises.
+    ///     <c>LuauGenerator.CompilePattern</c>), which nothing else here promises.
     /// </summary>
     private void CheckQualifiedNamePattern(QualifiedNamePattern pattern, Type inputType)
     {
