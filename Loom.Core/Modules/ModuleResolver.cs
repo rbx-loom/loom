@@ -114,7 +114,7 @@ public sealed class ModuleResolver
         if (importingDirectory == null)
             return false;
 
-        var basePath = Path.GetFullPath(Path.Combine(importingDirectory, specifier));
+        var basePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(importingDirectory, specifier)));
         var moduleDirectory = Path.GetDirectoryName(Path.GetFullPath(module.AbsolutePath));
         if (!string.Equals(basePath, moduleDirectory, StringComparison.Ordinal))
             return false; // named directly, not folded - the specifier already names this exact file

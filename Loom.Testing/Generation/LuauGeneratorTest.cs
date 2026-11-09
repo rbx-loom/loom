@@ -244,6 +244,41 @@ public class LuauGeneratorTest
     }
 
     [Fact]
+    public void Generates_NamedArgument_OutOfOrder_EvaluatesArgumentsInSourceOrder()
+    {
+        const string source = """
+            fn log(x: number): number { return x; }
+            fn sum(a: number, b: number): number { return a + b; }
+            sum(b: log(1), a: log(2));
+            """;
+
+        var rendered = Utility.GetLuauAST(source, true).Render();
+        var first = rendered.IndexOf("= log(1)", StringComparison.Ordinal);
+        var second = rendered.IndexOf("= log(2)", StringComparison.Ordinal);
+        Assert.True(first >= 0 && second > first, rendered);
+    }
+
+    [Fact]
+    public void Generates_NamedArgument_InDeclaredOrder_LeavesArgumentsInline()
+    {
+        const string source = """
+            fn log(x: number): number { return x; }
+            fn sum(a: number, b: number): number { return a + b; }
+            sum(a: log(1), b: log(2));
+            """;
+
+        var rendered = Utility.GetLuauAST(source, true).Render();
+        Assert.Contains("sum(log(1), log(2))", rendered);
+    }
+
+    [Fact]
+    public void Generates_DestructuringDeclaration_WithoutInitializer_DoesNotThrow()
+    {
+        var diagnostics = Utility.GetGeneratorDiagnostics("let { a };\nlet [b, c];\nlet (d, e);");
+        Assert.DoesNotContain(diagnostics.Set, diagnostic => diagnostic.Message.Contains("threw an exception"));
+    }
+
+    [Fact]
     public void Generates_NamedArgument_TrailingOmission_DropsItEntirely()
     {
         const string source = """
