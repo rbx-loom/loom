@@ -236,8 +236,7 @@ internal sealed partial class SerializationEmitter
         cursor.BitOffset = startBit;
         var unchanged = new List<LuauStatement>();
         var baselineTag = ResolveUnionTag(union, baselineValue, leaf + "_tag_b", unchanged);
-        var branches = new List<ElseIfBranch>();
-        IfStatement? head = null;
+        var chain = new IfChain(unchanged);
         for (var index = 0; index < union.Variants.Count; index++)
         {
             cursor.BitOffset = startBit;
@@ -248,11 +247,7 @@ internal sealed partial class SerializationEmitter
             widestBit = Math.Max(widestBit, cursor.BitOffset);
             cursor.Flush(variantStatements);
 
-            var condition = new BinaryOperator(baselineTag, "==", new NumberLiteral(index));
-            if (head == null)
-                unchanged.Add(head = new IfStatement(condition, new Chunk(variantStatements), branches, null));
-            else
-                branches.Add(new ElseIfBranch(condition, new Chunk(variantStatements)));
+            chain.Add(new BinaryOperator(baselineTag, "==", new NumberLiteral(index)), new Chunk(variantStatements));
         }
 
         statements.Add(new IfStatement(new Identifier(changed), new Chunk(resend), [], new Chunk(unchanged)));

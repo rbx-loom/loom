@@ -351,7 +351,7 @@ internal sealed partial class SerializationEmitter
 
         var startBit = cursor.BitOffset;
         var widestBit = startBit;
-        var branches = new List<ElseIfBranch>();
+        var chain = new IfChain(statements, new Chunk([new Return(BuildErrorTable("invalid_tag", unionField.Path, null))]));
         for (var index = 0; index < unionField.Variants.Count; index++)
         {
             cursor.BitOffset = startBit;
@@ -364,18 +364,7 @@ internal sealed partial class SerializationEmitter
             widestBit = Math.Max(widestBit, cursor.BitOffset);
             cursor.Flush(variantBody);
 
-            var condition = new BinaryOperator(new Identifier(tagLocal), "==", new NumberLiteral(index));
-            if (index == 0)
-                statements.Add(
-                    new IfStatement(
-                        condition,
-                        new Chunk(variantBody),
-                        branches,
-                        new Chunk([new Return(BuildErrorTable("invalid_tag", unionField.Path, null))])
-                    )
-                );
-            else
-                branches.Add(new ElseIfBranch(condition, new Chunk(variantBody)));
+            chain.Add(new BinaryOperator(new Identifier(tagLocal), "==", new NumberLiteral(index)), new Chunk(variantBody));
         }
 
         cursor.BitOffset = widestBit;

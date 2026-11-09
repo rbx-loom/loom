@@ -74,7 +74,7 @@ internal sealed partial class SerializationEmitter
             body.Add(new ConstVariable(valueLocal, null, Access(new Identifier(ValueParameter), serializationField.Path)));
             body.Add(new LocalVariable(SentinelIndexLocal(serializationField.Path), null, _zero));
 
-            var branches = new List<ElseIfBranch>();
+            var chain = new IfChain(body);
             for (var index = 0; index < sentinels.Count; index++)
             {
                 var condition = new BinaryOperator(new Identifier(valueLocal), "==", new Identifier(sentinels[index]));
@@ -82,10 +82,7 @@ internal sealed partial class SerializationEmitter
                     [new ExpressionStatement(new BinaryOperator(new Identifier(SentinelIndexLocal(serializationField.Path)), "=", new NumberLiteral(index + 1)))]
                 );
 
-                if (index == 0)
-                    body.Add(new IfStatement(condition, assign, branches, null));
-                else
-                    branches.Add(new ElseIfBranch(condition, assign));
+                chain.Add(condition, assign);
             }
         }
     }
@@ -135,15 +132,11 @@ internal sealed partial class SerializationEmitter
 
         body.Add(new LocalVariable(tagLocal, null, _zero));
 
-        var branches = new List<ElseIfBranch>();
+        var chain = new IfChain(body);
         for (var index = 1; index < unionField.Variants.Count; index++)
         {
             var condition = VariantCondition(unionField, subject, index);
-            var assign = new Chunk([new ExpressionStatement(new BinaryOperator(new Identifier(tagLocal), "=", new NumberLiteral(index)))]);
-            if (index == 1)
-                body.Add(new IfStatement(condition, assign, branches, null));
-            else
-                branches.Add(new ElseIfBranch(condition, assign));
+            chain.Add(condition, new Chunk([new ExpressionStatement(new BinaryOperator(new Identifier(tagLocal), "=", new NumberLiteral(index)))]));
         }
     }
 
@@ -262,79 +255,84 @@ internal sealed partial class SerializationEmitter
     /// <summary>Accumulates a field's width into the size local, for shapes that need control flow.</summary>
     private void EmitMeasure(SerializationField serializationField, LuauExpression value, List<LuauStatement> statements)
     {
-        if (serializationField is TupleField tupleField)
+        switch (serializationField)
         {
-            foreach (var (part, partValue) in ChildrenOf(tupleField, value))
-                MeasureField(part, partValue, statements);
+            case TupleField tupleField:
+                foreach (var (part, partValue) in ChildrenOf(tupleField, value))
+                    MeasureField(part, partValue, statements);
 
-            return;
+                return;
+
+            case OptionalField optionalField:
+                MeasureOptional(optionalField, value, statements);
+                return;
+
+            case UnionField unionField:
+                MeasureUnion(unionField, value, statements);
+                return;
+
+            case MapField mapField:
+                MeasureMap(mapField, value, statements);
+                return;
+
+            case ArrayField arrayField:
+                MeasureArray(arrayField, value, statements);
+                return;
+        }
+    }
+
+    private void MeasureOptional(OptionalField optionalField, LuauExpression value, List<LuauStatement> statements)
+    {
+        var innerStatements = new List<LuauStatement>();
+        foreach (var (inner, innerValue) in ChildrenOf(optionalField, value))
+            MeasureField(inner, innerValue, innerStatements);
+
+        if (innerStatements.Count > 0)
+            statements.Add(new IfStatement(IsPresent(value), new Chunk(innerStatements), [], null));
+    }
+
+    private void MeasureUnion(UnionField unionField, LuauExpression value, List<LuauStatement> statements)
+    {
+        var tag = UnionTag(unionField, value, statements);
+        var chain = new IfChain(statements);
+        for (var index = 0; index < unionField.Variants.Count; index++)
+        {
+            if (VariantSizeExpression(unionField, unionField.Variants[index], value) is not { } variantSize)
+                continue;
+
+            var addStatements = new List<LuauStatement>();
+            AddToSize(addStatements, variantSize);
+            chain.Add(new BinaryOperator(tag, "==", new NumberLiteral(index)), new Chunk(addStatements));
+        }
+    }
+
+    private void MeasureMap(MapField mapField, LuauExpression value, List<LuauStatement> statements)
+    {
+        AddToSize(statements, new NumberLiteral(mapField.LengthType.ByteCount()));
+
+        var countLocal = ReserveLocal(LeafName(mapField.Path) + "_count");
+        statements.Add(new LocalVariable(countLocal, null, _zero));
+
+        using (LoopScope())
+        {
+            var keyLocal = ReserveLocal(LeafName(mapField.Key.Path));
+            var valueLocal = ReserveLocal(LeafName(mapField.Value.Path));
+            var pairStatements = new List<LuauStatement> { new ExpressionStatement(new BinaryOperator(new Identifier(countLocal), "+=", _one)) };
+
+            MeasureField(mapField.Key, new Identifier(keyLocal), pairStatements);
+            MeasureField(mapField.Value, new Identifier(valueLocal), pairStatements);
+
+            statements.Add(new ForStatement([keyLocal, valueLocal], value, new Chunk(pairStatements)));
         }
 
-        if (serializationField is OptionalField optionalField)
-        {
-            var innerStatements = new List<LuauStatement>();
-            foreach (var (inner, innerValue) in ChildrenOf(optionalField, value))
-                MeasureField(inner, innerValue, innerStatements);
+        AddToSize(statements, ElementBitBlockSize(mapField.EntryBits, new Identifier(countLocal)));
 
-            if (innerStatements.Count > 0)
-                statements.Add(new IfStatement(IsPresent(value), new Chunk(innerStatements), [], null));
+        if (ReferenceEquals(statements, _measureRoot))
+            _boundCounts[mapField] = countLocal;
+    }
 
-            return;
-        }
-
-        if (serializationField is UnionField unionField)
-        {
-            var tag = UnionTag(unionField, value, statements);
-            var branches = new List<ElseIfBranch>();
-            IfStatement? head = null;
-            for (var index = 0; index < unionField.Variants.Count; index++)
-            {
-                if (VariantSizeExpression(unionField, unionField.Variants[index], value) is not { } variantSize)
-                    continue;
-
-                var condition = new BinaryOperator(tag, "==", new NumberLiteral(index));
-                var addStatements = new List<LuauStatement>();
-                AddToSize(addStatements, variantSize);
-                var add = new Chunk(addStatements);
-                if (head == null)
-                    statements.Add(head = new IfStatement(condition, add, branches, null));
-                else
-                    branches.Add(new ElseIfBranch(condition, add));
-            }
-
-            return;
-        }
-
-        if (serializationField is MapField mapField)
-        {
-            AddToSize(statements, new NumberLiteral(mapField.LengthType.ByteCount()));
-
-            var countLocal = ReserveLocal(LeafName(mapField.Path) + "_count");
-            statements.Add(new LocalVariable(countLocal, null, _zero));
-
-            using (LoopScope())
-            {
-                var keyLocal = ReserveLocal(LeafName(mapField.Key.Path));
-                var valueLocal = ReserveLocal(LeafName(mapField.Value.Path));
-                var pairStatements = new List<LuauStatement> { new ExpressionStatement(new BinaryOperator(new Identifier(countLocal), "+=", _one)) };
-
-                MeasureField(mapField.Key, new Identifier(keyLocal), pairStatements);
-                MeasureField(mapField.Value, new Identifier(valueLocal), pairStatements);
-
-                statements.Add(new ForStatement([keyLocal, valueLocal], value, new Chunk(pairStatements)));
-            }
-
-            AddToSize(statements, ElementBitBlockSize(mapField.EntryBits, new Identifier(countLocal)));
-
-            if (ReferenceEquals(statements, _measureRoot))
-                _boundCounts[mapField] = countLocal;
-
-            return;
-        }
-
-        if (serializationField is not ArrayField arrayField)
-            return;
-
+    private void MeasureArray(ArrayField arrayField, LuauExpression value, List<LuauStatement> statements)
+    {
         AddToSize(statements, new NumberLiteral(arrayField.LengthType.ByteCount()));
 
         var arrayCount = BindCount(value, LeafName(arrayField.Path), statements);
@@ -453,12 +451,7 @@ internal sealed partial class SerializationEmitter
         var origin = ReserveLocal(leaf + "_bits");
         body.Add(new ConstVariable(origin, null, Multiply(cursor.Position, new NumberLiteral(8))));
 
-        var blockBytes = FloorDivide(
-            new Parenthesized(Add(Multiply(count, new NumberLiteral(bitsPerElement)), new NumberLiteral(7))),
-            new NumberLiteral(8)
-        );
-
-        cursor.AdvanceBy(body, blockBytes);
+        cursor.AdvanceBy(body, ElementBitBlockSize(bitsPerElement, count));
         return new Identifier(origin);
     }
 
@@ -528,7 +521,8 @@ internal sealed partial class SerializationEmitter
     {
         switch (serializationField)
         {
-            case ConstantField: return;
+            case ConstantField:
+                return;
 
             case BoolField:
                 body.Add(new ExpressionStatement(WriteBits(cursor, 1, new IfExpression(value, _one, [], _zero))));
@@ -539,146 +533,40 @@ internal sealed partial class SerializationEmitter
                 return;
 
             case RangedNumberField ranged:
-            {
-                var scaled = value;
-                if (!ranged.Minimum.Equals(0d))
-                    scaled = new Parenthesized(Subtract(scaled, new NumberLiteral(ranged.Minimum)));
-
-                if (!ranged.Step.Equals(1d))
-                    scaled = Divide(scaled, new NumberLiteral(ranged.Step));
-
-                body.Add(new ExpressionStatement(WriteBits(cursor, ranged.HeaderBits, LuauFactory.MathCall("round", [scaled]))));
+                EmitRangedWrite(ranged, value, cursor, body);
                 return;
-            }
 
             case BlobField:
                 body.Add(new ExpressionStatement(LuauFactory.TableCall("insert", [new Identifier(BlobsLocal), value])));
                 return;
 
             case OptionalField optionalField:
-            {
-                body.Add(new ExpressionStatement(WriteBits(cursor, 1, new IfExpression(IsPresent(value), _one, [], _zero))));
-
-                cursor.GoDynamic(body);
-                cursor.Flush(body);
-
-                var present = new List<LuauStatement>();
-                foreach (var (inner, innerValue) in ChildrenOf(optionalField, value))
-                    EmitValueWrite(inner, innerValue, cursor, present);
-
-                cursor.Flush(present);
-                body.Add(new IfStatement(IsPresent(value), new Chunk(present), [], null));
-
+                EmitOptionalWrite(optionalField, value, cursor, body);
                 return;
-            }
 
             case MapField mapField:
-            {
-                var leaf = LeafName(mapField.Path);
-                var count = MapCount(mapField, leaf, value, body);
-
-                WriteNumber(cursor, mapField.LengthType, count, body);
-                if (NeedsBufferSpace(mapField.Key) || NeedsBufferSpace(mapField.Value))
-                    cursor.GoDynamic(body);
-
-                var pairBits = ReserveElementBits(mapField.EntryBits, leaf, count, cursor, body);
-                var index = ReserveLocal(leaf + "_index");
-                if (pairBits != null)
-                    body.Add(new LocalVariable(index, null, _one));
-
-                cursor.Flush(body);
-
-                using var pairScope = LoopScope();
-                var keyLocal = ReserveLocal(LeafName(mapField.Key.Path));
-                var valueLocal = ReserveLocal(LeafName(mapField.Value.Path));
-                var pairBody = new List<LuauStatement>();
-
-                var restorePair = EnterElement(cursor, pairBits, mapField.EntryBits, index);
-                EmitValueWrite(mapField.Key, new Identifier(keyLocal), cursor, pairBody);
-                EmitValueWrite(mapField.Value, new Identifier(valueLocal), cursor, pairBody);
-                restorePair();
-                cursor.Flush(pairBody);
-
-                if (pairBits != null)
-                    pairBody.Add(new ExpressionStatement(new BinaryOperator(new Identifier(index), "+=", _one)));
-
-                body.Add(new ForStatement([keyLocal, valueLocal], value, new Chunk(pairBody)));
+                EmitMapWrite(mapField, value, cursor, body);
                 return;
-            }
 
             case ArrayField arrayField:
-            {
-                var leaf = LeafName(arrayField.Path);
-                var count = ArrayCount(arrayField, leaf, value, body);
-                WriteNumber(cursor, arrayField.LengthType, count, body);
-                if (NeedsBufferSpace(arrayField.Element))
-                    cursor.GoDynamic(body);
-
-                var bitBase = ReserveElementBits(arrayField.Element.HeaderBits, leaf, count, cursor, body);
-                cursor.Flush(body);
-
-                using var elementScope = LoopScope();
-                var loop = ReserveLocal(LoopLocal);
-                var elementBody = new List<LuauStatement>();
-                var element = new Identifier(ReserveLocal(LeafName(arrayField.Element.Path)));
-                elementBody.Add(new ConstVariable(element.Name, null, new ElementAccess(value, new Identifier(loop))));
-
-                var restore = EnterElement(cursor, bitBase, arrayField.Element.HeaderBits, loop);
-                EmitValueWrite(arrayField.Element, element, cursor, elementBody);
-                restore();
-                cursor.Flush(elementBody);
-
-                body.Add(new NumericForStatement(loop, _one, count, null, new Chunk(elementBody)));
+                EmitArrayWrite(arrayField, value, cursor, body);
                 return;
-            }
 
             case StringField stringField:
-            {
-                var text = BindIfReused(value, 2, LeafName(stringField.Path), body);
-                var length = new Identifier(ReserveLocal(LeafName(stringField.Path) + "_length"));
-                body.Add(new ConstVariable(length.Name, null, Length(text)));
-
-                WriteNumber(cursor, stringField.LengthType, length, body);
-                cursor.GoDynamic(body);
-                body.Add(new ExpressionStatement(BufferCall("writestring", [new Identifier(BufferLocal), cursor.Position, text])));
-                cursor.AdvanceBy(body, length);
+                EmitStringWrite(stringField, value, cursor, body);
                 return;
-            }
 
             case DatatypeField { UseSentinels: false } datatypeField:
-            {
-                var bound = BindIfReused(value, datatypeField.Datatype.Components.Count, LeafName(datatypeField.Path), body);
-                foreach (var component in datatypeField.Datatype.Components)
-                    WriteNumber(cursor, datatypeField.NumberType, Access(bound, component), body);
-
+                EmitDatatypeWrite(datatypeField, value, cursor, body);
                 return;
-            }
 
             case CFrameField { UseSentinels: false } cframeField:
                 EmitCFrameWrite(cframeField, value, cursor, body);
                 return;
 
             case DatatypeField or CFrameField:
-            {
-                var sentinels = SentinelNamesOf(serializationField)!;
-                var indexLocal = new Identifier(SentinelIndexLocal(serializationField.Path));
-                var bound = new Identifier(SentinelValueLocal(serializationField.Path));
-                body.Add(new ExpressionStatement(WriteBits(cursor, BitWidth.ForStateCount(sentinels.Count + 1), indexLocal)));
-
-                cursor.GoDynamic(body);
-                cursor.Flush(body);
-
-                var components = new List<LuauStatement>();
-                if (serializationField is DatatypeField datatype)
-                    foreach (var component in datatype.Datatype.Components)
-                        WriteNumber(cursor, datatype.NumberType, Access(bound, component), components);
-                else
-                    EmitCFrameWrite((CFrameField)serializationField, bound, cursor, components);
-
-                cursor.Flush(components);
-                body.Add(new IfStatement(new BinaryOperator(indexLocal, "==", _zero), new Chunk(components), [], null));
+                EmitSentinelledWrite(serializationField, cursor, body);
                 return;
-            }
 
             case TupleField tupleField:
                 foreach (var (element, elementValue) in ChildrenOf(tupleField, value))
@@ -687,40 +575,163 @@ internal sealed partial class SerializationEmitter
                 return;
 
             case UnionField unionField:
-            {
-                var tag = UnionTag(unionField, value, body);
-                body.Add(new ExpressionStatement(WriteBits(cursor, unionField.TagBits, tag)));
-                cursor.GoDynamic(body);
-                cursor.Flush(body);
-
-                var startBit = cursor.BitOffset;
-                var widestBit = startBit;
-                var branches = new List<ElseIfBranch>();
-                IfStatement? head = null;
-                for (var index = 0; index < unionField.Variants.Count; index++)
-                {
-                    cursor.BitOffset = startBit;
-                    var variantBody = new List<LuauStatement>();
-                    foreach (var (variantField, variantValue) in ChildrenOf(unionField, unionField.Variants[index], value))
-                        EmitValueWrite(variantField, variantValue, cursor, variantBody);
-
-                    widestBit = Math.Max(widestBit, cursor.BitOffset);
-                    cursor.Flush(variantBody);
-
-                    if (variantBody.Count == 0)
-                        continue;
-
-                    var condition = new BinaryOperator(tag, "==", new NumberLiteral(index));
-                    if (head == null)
-                        body.Add(head = new IfStatement(condition, new Chunk(variantBody), branches, null));
-                    else
-                        branches.Add(new ElseIfBranch(condition, new Chunk(variantBody)));
-                }
-
-                cursor.BitOffset = widestBit;
+                EmitUnionWrite(unionField, value, cursor, body);
                 return;
-            }
         }
+    }
+
+    private void EmitRangedWrite(RangedNumberField ranged, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        var scaled = value;
+        if (!ranged.Minimum.Equals(0d))
+            scaled = new Parenthesized(Subtract(scaled, new NumberLiteral(ranged.Minimum)));
+
+        if (!ranged.Step.Equals(1d))
+            scaled = Divide(scaled, new NumberLiteral(ranged.Step));
+
+        body.Add(new ExpressionStatement(WriteBits(cursor, ranged.HeaderBits, LuauFactory.MathCall("round", [scaled]))));
+    }
+
+    private void EmitOptionalWrite(OptionalField optionalField, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        body.Add(new ExpressionStatement(WriteBits(cursor, 1, new IfExpression(IsPresent(value), _one, [], _zero))));
+
+        cursor.GoDynamic(body);
+        cursor.Flush(body);
+
+        var present = new List<LuauStatement>();
+        foreach (var (inner, innerValue) in ChildrenOf(optionalField, value))
+            EmitValueWrite(inner, innerValue, cursor, present);
+
+        cursor.Flush(present);
+        body.Add(new IfStatement(IsPresent(value), new Chunk(present), [], null));
+    }
+
+    private void EmitMapWrite(MapField mapField, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        var leaf = LeafName(mapField.Path);
+        var count = MapCount(mapField, leaf, value, body);
+
+        WriteNumber(cursor, mapField.LengthType, count, body);
+        if (NeedsBufferSpace(mapField.Key) || NeedsBufferSpace(mapField.Value))
+            cursor.GoDynamic(body);
+
+        var pairBits = ReserveElementBits(mapField.EntryBits, leaf, count, cursor, body);
+        var index = ReserveLocal(leaf + "_index");
+        if (pairBits != null)
+            body.Add(new LocalVariable(index, null, _one));
+
+        cursor.Flush(body);
+
+        using var pairScope = LoopScope();
+        var keyLocal = ReserveLocal(LeafName(mapField.Key.Path));
+        var valueLocal = ReserveLocal(LeafName(mapField.Value.Path));
+        var pairBody = new List<LuauStatement>();
+
+        var restorePair = EnterElement(cursor, pairBits, mapField.EntryBits, index);
+        EmitValueWrite(mapField.Key, new Identifier(keyLocal), cursor, pairBody);
+        EmitValueWrite(mapField.Value, new Identifier(valueLocal), cursor, pairBody);
+        restorePair();
+        cursor.Flush(pairBody);
+
+        if (pairBits != null)
+            pairBody.Add(new ExpressionStatement(new BinaryOperator(new Identifier(index), "+=", _one)));
+
+        body.Add(new ForStatement([keyLocal, valueLocal], value, new Chunk(pairBody)));
+    }
+
+    private void EmitArrayWrite(ArrayField arrayField, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        var leaf = LeafName(arrayField.Path);
+        var count = ArrayCount(arrayField, leaf, value, body);
+        WriteNumber(cursor, arrayField.LengthType, count, body);
+        if (NeedsBufferSpace(arrayField.Element))
+            cursor.GoDynamic(body);
+
+        var bitBase = ReserveElementBits(arrayField.Element.HeaderBits, leaf, count, cursor, body);
+        cursor.Flush(body);
+
+        using var elementScope = LoopScope();
+        var loop = ReserveLocal(LoopLocal);
+        var elementBody = new List<LuauStatement>();
+        var element = new Identifier(ReserveLocal(LeafName(arrayField.Element.Path)));
+        elementBody.Add(new ConstVariable(element.Name, null, new ElementAccess(value, new Identifier(loop))));
+
+        var restore = EnterElement(cursor, bitBase, arrayField.Element.HeaderBits, loop);
+        EmitValueWrite(arrayField.Element, element, cursor, elementBody);
+        restore();
+        cursor.Flush(elementBody);
+
+        body.Add(new NumericForStatement(loop, _one, count, null, new Chunk(elementBody)));
+    }
+
+    private void EmitStringWrite(StringField stringField, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        var text = BindIfReused(value, 2, LeafName(stringField.Path), body);
+        var length = new Identifier(ReserveLocal(LeafName(stringField.Path) + "_length"));
+        body.Add(new ConstVariable(length.Name, null, Length(text)));
+
+        WriteNumber(cursor, stringField.LengthType, length, body);
+        cursor.GoDynamic(body);
+        body.Add(new ExpressionStatement(BufferCall("writestring", [new Identifier(BufferLocal), cursor.Position, text])));
+        cursor.AdvanceBy(body, length);
+    }
+
+    private void EmitDatatypeWrite(DatatypeField datatypeField, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        var bound = BindIfReused(value, datatypeField.Datatype.Components.Count, LeafName(datatypeField.Path), body);
+        foreach (var component in datatypeField.Datatype.Components)
+            WriteNumber(cursor, datatypeField.NumberType, Access(bound, component), body);
+    }
+
+    private void EmitSentinelledWrite(SerializationField serializationField, Cursor cursor, List<LuauStatement> body)
+    {
+        var sentinels = SentinelNamesOf(serializationField)!;
+        var indexLocal = new Identifier(SentinelIndexLocal(serializationField.Path));
+        var bound = new Identifier(SentinelValueLocal(serializationField.Path));
+        body.Add(new ExpressionStatement(WriteBits(cursor, BitWidth.ForStateCount(sentinels.Count + 1), indexLocal)));
+
+        cursor.GoDynamic(body);
+        cursor.Flush(body);
+
+        var components = new List<LuauStatement>();
+        if (serializationField is DatatypeField datatype)
+            foreach (var component in datatype.Datatype.Components)
+                WriteNumber(cursor, datatype.NumberType, Access(bound, component), components);
+        else
+            EmitCFrameWrite((CFrameField)serializationField, bound, cursor, components);
+
+        cursor.Flush(components);
+        body.Add(new IfStatement(new BinaryOperator(indexLocal, "==", _zero), new Chunk(components), [], null));
+    }
+
+    private void EmitUnionWrite(UnionField unionField, LuauExpression value, Cursor cursor, List<LuauStatement> body)
+    {
+        var tag = UnionTag(unionField, value, body);
+        body.Add(new ExpressionStatement(WriteBits(cursor, unionField.TagBits, tag)));
+        cursor.GoDynamic(body);
+        cursor.Flush(body);
+
+        var startBit = cursor.BitOffset;
+        var widestBit = startBit;
+        var chain = new IfChain(body);
+        for (var index = 0; index < unionField.Variants.Count; index++)
+        {
+            cursor.BitOffset = startBit;
+            var variantBody = new List<LuauStatement>();
+            foreach (var (variantField, variantValue) in ChildrenOf(unionField, unionField.Variants[index], value))
+                EmitValueWrite(variantField, variantValue, cursor, variantBody);
+
+            widestBit = Math.Max(widestBit, cursor.BitOffset);
+            cursor.Flush(variantBody);
+
+            if (variantBody.Count == 0)
+                continue;
+
+            chain.Add(new BinaryOperator(tag, "==", new NumberLiteral(index)), new Chunk(variantBody));
+        }
+
+        cursor.BitOffset = widestBit;
     }
 
     private void EmitCFrameWrite(CFrameField cframeField, LuauExpression value, Cursor cursor, List<LuauStatement> body)

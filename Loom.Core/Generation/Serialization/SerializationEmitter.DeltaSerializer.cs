@@ -234,15 +234,11 @@ internal sealed partial class SerializationEmitter
         var tagLocal = ReserveLocal(preferredName);
         body.Add(new LocalVariable(tagLocal, null, _zero));
 
-        var branches = new List<ElseIfBranch>();
+        var chain = new IfChain(body);
         for (var index = 1; index < unionField.Variants.Count; index++)
         {
             var condition = VariantCondition(unionField, subject, index);
-            var assign = new Chunk([new ExpressionStatement(new BinaryOperator(new Identifier(tagLocal), "=", new NumberLiteral(index)))]);
-            if (index == 1)
-                body.Add(new IfStatement(condition, assign, branches, null));
-            else
-                branches.Add(new ElseIfBranch(condition, assign));
+            chain.Add(condition, new Chunk([new ExpressionStatement(new BinaryOperator(new Identifier(tagLocal), "=", new NumberLiteral(index)))]));
         }
 
         return new Identifier(tagLocal);
@@ -328,15 +324,11 @@ internal sealed partial class SerializationEmitter
         body.Add(new ConstVariable(valueLocal, null, value));
         body.Add(new LocalVariable(indexLocal, null, _zero));
 
-        var branches = new List<ElseIfBranch>();
+        var chain = new IfChain(body);
         for (var index = 0; index < sentinels.Count; index++)
         {
             var condition = new BinaryOperator(new Identifier(valueLocal), "==", new Identifier(sentinels[index]));
-            var assign = new Chunk([new ExpressionStatement(new BinaryOperator(new Identifier(indexLocal), "=", new NumberLiteral(index + 1)))]);
-            if (index == 0)
-                body.Add(new IfStatement(condition, assign, branches, null));
-            else
-                branches.Add(new ElseIfBranch(condition, assign));
+            chain.Add(condition, new Chunk([new ExpressionStatement(new BinaryOperator(new Identifier(indexLocal), "=", new NumberLiteral(index + 1)))]));
         }
     }
 
@@ -405,8 +397,7 @@ internal sealed partial class SerializationEmitter
         cursor.Flush(resend);
 
         var unchanged = new List<LuauStatement>();
-        var branches = new List<ElseIfBranch>();
-        IfStatement? head = null;
+        var chain = new IfChain(unchanged);
         for (var index = 0; index < union.Variants.Count; index++)
         {
             cursor.BitOffset = startBit;
@@ -424,11 +415,7 @@ internal sealed partial class SerializationEmitter
             if (variantBody.Count == 0)
                 continue;
 
-            var condition = new BinaryOperator(currentTag, "==", new NumberLiteral(index));
-            if (head == null)
-                unchanged.Add(head = new IfStatement(condition, new Chunk(variantBody), branches, null));
-            else
-                branches.Add(new ElseIfBranch(condition, new Chunk(variantBody)));
+            chain.Add(new BinaryOperator(currentTag, "==", new NumberLiteral(index)), new Chunk(variantBody));
         }
 
         body.Add(new IfStatement(new Identifier(changed), new Chunk(resend), [], new Chunk(unchanged)));
