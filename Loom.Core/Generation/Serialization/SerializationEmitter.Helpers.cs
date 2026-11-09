@@ -195,17 +195,6 @@ internal sealed partial class SerializationEmitter
             _ => subscript
         };
 
-    private static LuauExpression ToLiteral(object? value) =>
-        value switch
-        {
-            string s => new StringLiteral(s),
-            bool b => new BooleanLiteral(b),
-            double d => new NumberLiteral(d),
-            long l => new NumberLiteral(l),
-            int i => new NumberLiteral(i),
-            _ => new NilLiteral()
-        };
-
     private static LuauExpression Add(LuauExpression left, LuauExpression right) =>
         IsNumber(left, 0)
             ? right

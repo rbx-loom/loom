@@ -156,7 +156,7 @@ internal sealed partial class SerializationEmitter
     private LuauExpression EmitRead(SerializationField serializationField, Cursor cursor, List<LuauStatement> statements) =>
         serializationField switch
         {
-            ConstantField constant => ToLiteral(constant.Value),
+            ConstantField constant => LuauFactory.Literal(constant.Value),
             BoolField => new BinaryOperator(ReadBits(cursor, 1), "==", _one),
             NumberField numberField => ReadNumber(cursor, numberField.NumberType, statements, LeafName(numberField.Path)),
             RangedNumberField ranged => EmitRangedRead(ranged, cursor),
@@ -380,7 +380,7 @@ internal sealed partial class SerializationEmitter
         switch (unionField.Discrimination)
         {
             case UnionDiscrimination.LiteralValue:
-                return ToLiteral(variant.Discriminant);
+                return LuauFactory.Literal(variant.Discriminant);
             case UnionDiscrimination.RuntimeKind:
                 return variant.Fields.Count == 1 ? EmitRead(variant.Fields[0], cursor, body) : new NilLiteral();
             
@@ -389,7 +389,7 @@ internal sealed partial class SerializationEmitter
                 break;
         }
 
-        var initializers = new List<TableInitializer> { new PropertyTableInitializer(unionField.DiscriminantName!, ToLiteral(variant.Discriminant)) };
+        var initializers = new List<TableInitializer> { new PropertyTableInitializer(unionField.DiscriminantName!, LuauFactory.Literal(variant.Discriminant)) };
         initializers.AddRange(
             variant.Fields.Select(variantField => new PropertyTableInitializer(LeafName(variantField.Path), EmitRead(variantField, cursor, body)))
         );

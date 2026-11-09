@@ -146,15 +146,4 @@ public sealed partial class LuauGenerator
             BinaryOperator => new Luau.AST.UnaryOperator("not ", new Luau.AST.Parenthesized(condition)),
             _ => new Luau.AST.UnaryOperator("not ", condition)
         };
-
-    private static LuauExpression LiteralValueToExpression(object? value) =>
-        value switch
-        {
-            long l => new NumberLiteral(l),
-            int i => new NumberLiteral(i),
-            double d => new NumberLiteral(d),
-            string s => new StringLiteral(s),
-            bool b => new BooleanLiteral(b),
-            _ => new NilLiteral()
-        };
 }

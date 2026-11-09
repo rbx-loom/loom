@@ -37,7 +37,7 @@ internal sealed partial class SerializationEmitter
         {
             if (field is ConstantField constant)
             {
-                initializers.Add(new PropertyTableInitializer(LeafName(field.Path), ToLiteral(constant.Value)));
+                initializers.Add(new PropertyTableInitializer(LeafName(field.Path), LuauFactory.Literal(constant.Value)));
                 continue;
             }
 
@@ -92,7 +92,7 @@ internal sealed partial class SerializationEmitter
         if (diffFields.Count == 0)
         {
             var initializers = schema.Fields.OfType<ConstantField>()
-                .Select(TableInitializer (constant) => new PropertyTableInitializer(LeafName(constant.Path), ToLiteral(constant.Value)))
+                .Select(TableInitializer (constant) => new PropertyTableInitializer(LeafName(constant.Path), LuauFactory.Literal(constant.Value)))
                 .ToList();
 
             return new Function(
@@ -137,7 +137,7 @@ internal sealed partial class SerializationEmitter
     private LuauExpression EmitFieldDiffRead(SerializationField field, LuauExpression baselineValue, Cursor cursor, List<LuauStatement> statements) =>
         field switch
         {
-            ConstantField constant => ToLiteral(constant.Value),
+            ConstantField constant => LuauFactory.Literal(constant.Value),
             TupleField tuple => EmitTupleDiffRead(tuple, baselineValue, cursor, statements),
             OptionalField optional => EmitOptionalDiffRead(optional, baselineValue, cursor, statements),
             UnionField union => EmitUnionDiffRead(union, baselineValue, cursor, statements),
@@ -266,7 +266,7 @@ internal sealed partial class SerializationEmitter
         switch (union.Discrimination)
         {
             case UnionDiscrimination.LiteralValue:
-                return ToLiteral(variant.Discriminant);
+                return LuauFactory.Literal(variant.Discriminant);
             case UnionDiscrimination.RuntimeKind:
             {
                 if (variant.Fields is not [var onlyField])
@@ -278,7 +278,7 @@ internal sealed partial class SerializationEmitter
             case UnionDiscrimination.Discriminant:
             default:
             {
-                var initializers = new List<TableInitializer> { new PropertyTableInitializer(union.DiscriminantName!, ToLiteral(variant.Discriminant)) };
+                var initializers = new List<TableInitializer> { new PropertyTableInitializer(union.DiscriminantName!, LuauFactory.Literal(variant.Discriminant)) };
                 initializers.AddRange(
                     from variantField in variant.Fields
                     let fieldBaseline = AccessRelative(baselineValue, variantField.Path, union.Path)

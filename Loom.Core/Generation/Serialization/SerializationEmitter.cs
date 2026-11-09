@@ -63,7 +63,7 @@ internal sealed partial class SerializationEmitter(SerializationSchema schema, L
         {
             if (indexer is { KeyType: LiteralType key, ValueType: InterfaceType indexedValue }
                 && resolveSerializerName(indexedValue) is { } indexedSerializer)
-                initializers.Add(new ComputedPropertyTableInitializer(ToLiteral(key.Value), new Identifier(indexedSerializer)));
+                initializers.Add(new ComputedPropertyTableInitializer(LuauFactory.Literal(key.Value), new Identifier(indexedSerializer)));
         }
 
         return initializers.Count == 0

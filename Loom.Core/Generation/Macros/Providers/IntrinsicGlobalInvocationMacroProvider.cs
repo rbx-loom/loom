@@ -32,141 +32,135 @@ internal sealed class IntrinsicGlobalInvocationMacroProvider : IMacroProvider
         Call call,
         [MaybeNullWhen(false)] out LuauExpression expression)
     {
-        switch (name)
+        var expanded = Expand(context, name, typeArguments, call);
+        expression = expanded!;
+
+        return expanded != null;
+    }
+
+    private static LuauExpression? Expand(MacroContext context, string name, TypeArguments? typeArguments, Call call) =>
+        name switch
         {
-            case "get_service":
-                var serviceName = context.GetTextOfOnlyTypeArgument(typeArguments, name);
-                expression = LuauFactory.LibraryCall("game", ["GetService"], [new StringLiteral(serviceName)], true);
-
-                return true;
-            case "new_instance":
-                var instanceName = context.GetTextOfOnlyTypeArgument(typeArguments, name);
-                expression = LuauFactory.LibraryCall("Instance", ["new"], [new StringLiteral(instanceName)]);
-
-                return true;
-            case "string":
-                expression = TryFoldToString(call.Arguments[0], out var stringLiteral)
-                    ? stringLiteral
-                    : new Call(new Identifier("tostring"), call.Arguments);
-
-                return true;
-            case "number":
-                expression = call.Arguments[0] is StringLiteral numberSource
-                    ? LuauNumberFormat.TryParse(numberSource.Value, out var parsed) ? new NumberLiteral(parsed) : new NilLiteral()
-                    : new Call(new Identifier("tonumber"), call.Arguments);
-
-                return true;
+            "get_service" => LuauFactory.LibraryCall("game", ["GetService"], [new StringLiteral(context.GetTextOfOnlyTypeArgument(typeArguments, name))], true),
+            "new_instance" => LuauFactory.LibraryCall("Instance", ["new"], [new StringLiteral(context.GetTextOfOnlyTypeArgument(typeArguments, name))]),
+            "string" => ExpandString(call),
+            "number" => ExpandNumber(call),
             // the deprecated global 'wait' still exists in Roblox and is not this one, so the name is
             // resolved to task.wait rather than left to bind to whichever the runtime happens to have
-            case "wait":
-                expression = LuauFactory.TaskCall("wait", call.Arguments);
-                return true;
-            case "type_is":
-                expression = new BinaryOperator(new Call(new Identifier("typeof"), [call.Arguments[0]]), "==", call.Arguments[1]);
-                return true;
-            case "get_metadata":
-            {
-                var matchedAttribute = FindMatchedAttribute(context, typeArguments, name, out var hadError);
-                expression = hadError || matchedAttribute == null
-                    ? new NilLiteral()
-                    : new Table(
-                        matchedAttribute.Arguments.ArgumentList
-                            .ConvertAll(argument => new TableInitializer(ToLuauConstant(context.SemanticModel.GetConstantValue(argument))))
-                    );
+            "wait" => LuauFactory.TaskCall("wait", call.Arguments),
+            "type_is" => new BinaryOperator(new Call(new Identifier("typeof"), [call.Arguments[0]]), "==", call.Arguments[1]),
+            "get_metadata" => ExpandGetMetadata(context, typeArguments, name),
+            "has_attribute" => ExpandHasAttribute(context, typeArguments, name),
+            "serializer_of" => ExpandSerializerOf(context, typeArguments, name, call),
+            "serialize_binary" or "deserialize_binary" or "serializer" => ExpandCodec(context, typeArguments, name, call),
+            "diff_binary" or "apply_diff_binary" => ExpandDiff(context, name, call),
+            _ => null
+        };
 
-                return true;
-            }
-            case "has_attribute":
-            {
-                var matchedAttribute = FindMatchedAttribute(context, typeArguments, name, out var hadError);
-                expression = new BooleanLiteral(!hadError && matchedAttribute != null);
-                return true;
-            }
-            case "serializer_of":
-            {
-                if (typeArguments?.ArgumentsList.FirstOrDefault() is not { } mapArgument
-                    || context.SemanticModel.GetType(mapArgument) is not InterfaceType mapType)
-                {
-                    context.Diagnostics.Error(context.Node, InternalCodes.InvalidTypeArguments, $"'{name}' requires a mapping interface as its first type argument.");
-                    expression = new NilLiteral();
-                    return true;
-                }
+    private static LuauExpression ExpandString(Call call) =>
+        TryFoldToString(call.Arguments[0], out var folded) ? folded : new Call(new Identifier("tostring"), call.Arguments);
 
-                if (!context.SemanticModel.SerializerMaps.Contains(mapType))
-                    context.SemanticModel.SerializerMaps.Add(mapType);
+    private static LuauExpression ExpandNumber(Call call) =>
+        call.Arguments[0] is StringLiteral source
+            ? LuauNumberFormat.TryParse(source.Value, out var parsed) ? new NumberLiteral(parsed) : new NilLiteral()
+            : new Call(new Identifier("tonumber"), call.Arguments);
 
-                expression = new Luau.AST.ElementAccess(new Identifier(SerializationEmitter.SerializerMapName(mapType.Name)), call.Arguments[0]);
-                return true;
-            }
-            case "serialize_binary":
-            case "deserialize_binary":
-            case "serializer":
-            {
-                // serialize_binary infers its interface from the argument's static type; deserialize_binary
-                // has no value to infer from, so it takes the interface as a type argument.
-                var isSerialize = name == "serialize_binary";
-                var invocation = (Invocation)context.Node;
-                Node? subject = isSerialize
-                    ? invocation.Arguments.ArgumentList.FirstOrDefault()
-                    : typeArguments?.ArgumentsList.FirstOrDefault();
+    private static LuauExpression ExpandGetMetadata(MacroContext context, TypeArguments? typeArguments, string name)
+    {
+        var matchedAttribute = FindMatchedAttribute(context, typeArguments, name, out var hadError);
+        if (hadError || matchedAttribute == null)
+            return new NilLiteral();
 
-                if (subject == null || !TryGetSerializableName(context, subject, name, out var interfaceName, out var declaringFile))
-                {
-                    expression = new NilLiteral();
-                    return true;
-                }
+        return new Table(
+            matchedAttribute.Arguments.ArgumentList
+                .ConvertAll(argument => new TableInitializer(LuauFactory.Literal(context.SemanticModel.GetConstantValue(argument))))
+        );
+    }
 
-                // Only the codec object crosses a module boundary, so an imported interface's calls go
-                // through it rather than through function names that are local to the declaring file.
-                var isImported = declaringFile != context.SemanticModel.Tree.File.AbsolutePath;
+    private static LuauExpression ExpandHasAttribute(MacroContext context, TypeArguments? typeArguments, string name)
+    {
+        var matchedAttribute = FindMatchedAttribute(context, typeArguments, name, out var hadError);
 
-                // 'serializer' hands back the codec value itself rather than calling through it.
-                if (name == "serializer")
-                {
-                    expression = new Identifier(SerializationEmitter.SerializerName(interfaceName));
-                    return true;
-                }
+        return new BooleanLiteral(!hadError && matchedAttribute != null);
+    }
 
-                LuauExpression callee = isImported
-                    ? new Luau.AST.PropertyAccess(
-                        new Identifier(SerializationEmitter.SerializerName(interfaceName)),
-                        [isSerialize ? "serialize" : "deserialize"]
-                    )
-                    : new Identifier(isSerialize ? SerializationEmitter.SerializeName(interfaceName) : SerializationEmitter.DeserializeName(interfaceName));
+    private static LuauExpression ExpandSerializerOf(MacroContext context, TypeArguments? typeArguments, string name, Call call)
+    {
+        if (typeArguments?.ArgumentsList.FirstOrDefault() is not { } mapArgument
+            || context.SemanticModel.GetType(mapArgument) is not InterfaceType mapType)
+        {
+            context.Diagnostics.Error(context.Node, InternalCodes.InvalidTypeArguments, $"'{name}' requires a mapping interface as its first type argument.");
 
-                expression = new Call(callee, call.Arguments);
-                return true;
-            }
-            case "diff_binary":
-            case "apply_diff_binary":
-            {
-                // Both take the baseline as their first argument, so - unlike deserialize_binary - the
-                // interface is always inferable from a value and neither needs a type argument.
-                var isDiff = name == "diff_binary";
-                var invocation = (Invocation)context.Node;
-                var subject = invocation.Arguments.ArgumentList.FirstOrDefault();
-
-                if (subject == null || !TryGetSerializableName(context, subject, name, out var interfaceName, out var declaringFile))
-                {
-                    expression = new NilLiteral();
-                    return true;
-                }
-
-                var isImported = declaringFile != context.SemanticModel.Tree.File.AbsolutePath;
-                LuauExpression callee = isImported
-                    ? new Luau.AST.PropertyAccess(
-                        new Identifier(SerializationEmitter.SerializerName(interfaceName)),
-                        [isDiff ? "diff" : "apply_diff"]
-                    )
-                    : new Identifier(isDiff ? SerializationEmitter.DiffName(interfaceName) : SerializationEmitter.ApplyDiffName(interfaceName));
-
-                expression = new Call(callee, call.Arguments);
-                return true;
-            }
+            return new NilLiteral();
         }
 
-        expression = null;
-        return false;
+        if (!context.SemanticModel.SerializerMaps.Contains(mapType))
+            context.SemanticModel.SerializerMaps.Add(mapType);
+
+        return new Luau.AST.ElementAccess(new Identifier(SerializationEmitter.SerializerMapName(mapType.Name)), call.Arguments[0]);
+    }
+
+    private static LuauExpression ExpandCodec(MacroContext context, TypeArguments? typeArguments, string name, Call call)
+    {
+        // serialize_binary infers its interface from the argument's static type; deserialize_binary
+        // has no value to infer from, so it takes the interface as a type argument.
+        var isSerialize = name == "serialize_binary";
+        var invocation = (Invocation)context.Node;
+        Node? subject = isSerialize
+            ? invocation.Arguments.ArgumentList.FirstOrDefault()
+            : typeArguments?.ArgumentsList.FirstOrDefault();
+
+        if (subject == null || !TryGetSerializableName(context, subject, name, out var interfaceName, out var declaringFile))
+            return new NilLiteral();
+
+        // 'serializer' hands back the codec value itself rather than calling through it.
+        if (name == "serializer")
+            return new Identifier(SerializationEmitter.SerializerName(interfaceName));
+
+        return CallCodec(
+            context,
+            call,
+            interfaceName,
+            declaringFile,
+            isSerialize ? "serialize" : "deserialize",
+            isSerialize ? SerializationEmitter.SerializeName(interfaceName) : SerializationEmitter.DeserializeName(interfaceName)
+        );
+    }
+
+    private static LuauExpression ExpandDiff(MacroContext context, string name, Call call)
+    {
+        // Both take the baseline as their first argument, so - unlike deserialize_binary - the
+        // interface is always inferable from a value and neither needs a type argument.
+        var isDiff = name == "diff_binary";
+        var invocation = (Invocation)context.Node;
+        var subject = invocation.Arguments.ArgumentList.FirstOrDefault();
+
+        if (subject == null || !TryGetSerializableName(context, subject, name, out var interfaceName, out var declaringFile))
+            return new NilLiteral();
+
+        return CallCodec(
+            context,
+            call,
+            interfaceName,
+            declaringFile,
+            isDiff ? "diff" : "apply_diff",
+            isDiff ? SerializationEmitter.DiffName(interfaceName) : SerializationEmitter.ApplyDiffName(interfaceName)
+        );
+    }
+
+    /// <summary>
+    ///     Only the codec object crosses a module boundary, so an imported interface's calls go through
+    ///     its <paramref name="codecMember" /> rather than through the function names that are local to
+    ///     the declaring file.
+    /// </summary>
+    private static Call CallCodec(MacroContext context, Call call, string interfaceName, string declaringFile, string codecMember, string localFunction)
+    {
+        var isImported = declaringFile != context.SemanticModel.Tree.File.AbsolutePath;
+        LuauExpression callee = isImported
+            ? new Luau.AST.PropertyAccess(new Identifier(SerializationEmitter.SerializerName(interfaceName)), [codecMember])
+            : new Identifier(localFunction);
+
+        return new Call(callee, call.Arguments);
     }
 
     /// <summary>
@@ -276,17 +270,6 @@ internal sealed class IntrinsicGlobalInvocationMacroProvider : IMacroProvider
         return target?.Attributes?.AttributeList.Find(a => semanticModel.GetSymbol(a.Expression) == attributeSymbol);
     }
 
-    private static LuauExpression ToLuauConstant(object? value) =>
-        value switch
-        {
-            long l => new NumberLiteral(l),
-            int i => new NumberLiteral(i),
-            double d => new NumberLiteral(d),
-            string s => new StringLiteral(s),
-            bool b => new BooleanLiteral(b),
-            _ => new NilLiteral()
-        };
-
     private static bool TryFoldToString(LuauExpression argument, [MaybeNullWhen(false)] out StringLiteral folded)
     {
         switch (argument)
@@ -311,4 +294,4 @@ internal sealed class IntrinsicGlobalInvocationMacroProvider : IMacroProvider
                 return false;
         }
     }
-}
+}

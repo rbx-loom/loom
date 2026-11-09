@@ -1,5 +1,6 @@
 using Loom.Core.Parsing.AST;
 using Loom.Core.TypeChecking.Types;
+using Loom.Luau;
 using Loom.Luau.AST;
 using BinaryOperator = Loom.Luau.AST.BinaryOperator;
 using FunctionType = Loom.Core.TypeChecking.Types.FunctionType;
@@ -133,7 +134,7 @@ public sealed partial class LuauGenerator
                 return BindWhole(letPattern.Name.Text, subject, bindings);
 
             case LiteralPattern literalPattern:
-                return Require(conditions, EqualTo(subject, LiteralValueToExpression(literalPattern.Value)));
+                return Require(conditions, EqualTo(subject, LuauFactory.Literal(literalPattern.Value)));
 
             case QualifiedNamePattern qualifiedNamePattern:
                 return CompileQualifiedNamePattern(qualifiedNamePattern, subject, conditions);
@@ -222,17 +223,17 @@ public sealed partial class LuauGenerator
     // its way to a compile the diagnostic already fails.
     private PatternShape CompileQualifiedNamePattern(QualifiedNamePattern qualifiedNamePattern, LuauExpression subject, List<LuauExpression> conditions) =>
         _semanticModel.GetType(qualifiedNamePattern) is LiteralType literalType
-            ? Require(conditions, EqualTo(subject, LiteralValueToExpression(literalType.Value)))
+            ? Require(conditions, EqualTo(subject, LuauFactory.Literal(literalType.Value)))
             : PatternShape.Unsupported;
 
     private static PatternShape CompileRangePattern(RangePattern rangePattern, LuauExpression subject, List<LuauExpression> conditions)
     {
         AddTypeofCondition(conditions, PrimitiveType.Number, subject);
         if (rangePattern.Minimum is LiteralPattern minimum)
-            conditions.Add(new BinaryOperator(subject, ">=", LiteralValueToExpression(minimum.Value)));
+            conditions.Add(new BinaryOperator(subject, ">=", LuauFactory.Literal(minimum.Value)));
 
         if (rangePattern.Maximum is LiteralPattern maximum)
-            conditions.Add(new BinaryOperator(subject, "<=", LiteralValueToExpression(maximum.Value)));
+            conditions.Add(new BinaryOperator(subject, "<=", LuauFactory.Literal(maximum.Value)));
 
         return PatternShape.Refutable;
     }

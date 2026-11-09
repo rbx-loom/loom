@@ -703,16 +703,7 @@ public sealed partial class LuauGenerator
     public override LuauNode VisitTupleExpression(TupleExpression tupleExpression) =>
         new Table(tupleExpression.Expressions.ConvertAll(e => new TableInitializer(Visit(e))));
 
-    public override LuauNode VisitLiteral(Literal literal) =>
-        literal.Value switch
-        {
-            long l => new NumberLiteral(l),
-            int i => new NumberLiteral(i),
-            double d => new NumberLiteral(d),
-            string s => new StringLiteral(s),
-            bool b => new BooleanLiteral(b),
-            _ => new NilLiteral()
-        };
+    public override LuauNode VisitLiteral(Literal literal) => LuauFactory.Literal(literal.Value);
 
     public override LuauNode VisitInterpolatedStringLiteral(InterpolatedStringLiteral interpolatedStringLiteral)
     {

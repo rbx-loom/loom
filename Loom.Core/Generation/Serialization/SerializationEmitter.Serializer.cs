@@ -146,13 +146,13 @@ internal sealed partial class SerializationEmitter
         var discriminant = unionField.Variants[index].Discriminant;
         return unionField.Discrimination switch
         {
-            UnionDiscrimination.LiteralValue => new BinaryOperator(value, "==", ToLiteral(discriminant)),
+            UnionDiscrimination.LiteralValue => new BinaryOperator(value, "==", LuauFactory.Literal(discriminant)),
             UnionDiscrimination.RuntimeKind => new BinaryOperator(
                 new Call(new Identifier("typeof"), [value]),
                 "==",
                 new StringLiteral((string)discriminant!)
             ),
-            _ => new BinaryOperator(new PropertyAccess(value, [unionField.DiscriminantName!]), "==", ToLiteral(discriminant))
+            _ => new BinaryOperator(new PropertyAccess(value, [unionField.DiscriminantName!]), "==", LuauFactory.Literal(discriminant))
         };
     }
 

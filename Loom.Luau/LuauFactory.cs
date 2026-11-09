@@ -40,6 +40,17 @@ public static class LuauFactory
     public static Call MathCall(string name, List<LuauExpression> arguments) => LibraryCall("math", [name], arguments);
     public static Call MathClampCall(LuauExpression value, LuauExpression minimum, LuauExpression maximum) => MathCall("clamp", [value, minimum, maximum]);
     public static Call TableCall(string name, List<LuauExpression> arguments) => LibraryCall("table", [name], arguments);
+
+    public static LuauExpression Literal(object? value) =>
+        value switch
+        {
+            long l => new NumberLiteral(l),
+            int i => new NumberLiteral(i),
+            double d => new NumberLiteral(d),
+            string s => new StringLiteral(s),
+            bool b => new BooleanLiteral(b),
+            _ => new NilLiteral()
+        };
     public static Call StringCall(string name, List<LuauExpression> arguments) => LibraryCall("string", [name], arguments);
     public static Call TaskCall(string name, List<LuauExpression> arguments) => LibraryCall("task", [name], arguments);
     public static Call RequireCall(string path) => new(new Identifier("require"), [new StringLiteral(path)]);
