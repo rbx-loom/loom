@@ -144,7 +144,8 @@ public sealed class TypeNarrower
         Type? baseType;
         if (predicate.ParameterIndex is { } index)
         {
-            var argument = invocation.Arguments.ArgumentList.ElementAtOrDefault(index);
+            var declaration = _semanticModel.GetSymbol(invocation.Expression)?.Declaration as DeclareFunctionSignature;
+            var argument = InvocationArguments.ForParameter(invocation.Arguments, declaration?.Parameters, index);
             if (argument == null)
                 return new BranchStates(current, current);
 

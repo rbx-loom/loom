@@ -206,8 +206,30 @@ public sealed partial class TypeChecker
             BindDestructuringElement(target.Elements[i], tupleType.ElementTypes[i]);
     }
 
+    /// <summary>
+    ///     A subject that may be <c>none</c> is reported the way <c>subject.field</c> would be, since the
+    ///     emitted reads are exactly that - and a default only rescues the element it is written on, never the
+    ///     value the elements are read off. What remains is returned, so one optional subject does not also
+    ///     report every field as missing.
+    /// </summary>
+    private Type RejectNoneDestructureSubject(DestructuringTarget target, Type subjectType)
+    {
+        if (!Type.IsOptional(subjectType) || !Type.IsNotNever(subjectType.NonNullable()))
+            return subjectType;
+
+        _diagnostics.Error(
+            target,
+            InternalCodes.PossiblyNoneAccess,
+            $"'{subjectType}' is possibly 'none'.",
+            "narrow it to a value that is not 'none' before destructuring it"
+        );
+
+        return subjectType.NonNullable();
+    }
+
     private void CheckArrayDestructuringTarget(ArrayDestructuringTarget target, Type subjectType)
     {
+        subjectType = RejectNoneDestructureSubject(target, subjectType);
         var elementType = GetArrayElementType(subjectType);
         if (elementType == null)
         {
@@ -229,9 +251,10 @@ public sealed partial class TypeChecker
     private void BindDestructuringElement(DestructuringElement element, Type elementType)
     {
         CheckDestructuringDefault(element.EqualsValueClause, elementType);
-        BindType(element, elementType);
+        var boundType = element.EqualsValueClause != null ? elementType.NonNullable() : elementType;
+        BindType(element, boundType);
         if (element.NestedTarget != null)
-            CheckDestructuringTarget(element.NestedTarget, elementType);
+            CheckDestructuringTarget(element.NestedTarget, boundType);
     }
 
     /// <summary>Constrains a binding's default value to the type of the source it falls back for - the same check a parameter default's initializer gets against its declared type.</summary>
@@ -246,6 +269,7 @@ public sealed partial class TypeChecker
 
     private void CheckObjectDestructuringTarget(ObjectDestructuringTarget target, Type subjectType)
     {
+        subjectType = RejectNoneDestructureSubject(target, subjectType);
         foreach (var field in target.Fields)
         {
             var propertyType = TypeSimplifier.GetMemberPropertyType(subjectType, field.Name.Text);
@@ -262,9 +286,10 @@ public sealed partial class TypeChecker
             }
 
             CheckDestructuringDefault(field.EqualsValueClause, propertyType);
-            BindType(field, propertyType);
+            var boundType = field.EqualsValueClause != null ? propertyType.NonNullable() : propertyType;
+            BindType(field, boundType);
             if (field.NestedTarget != null)
-                CheckDestructuringTarget(field.NestedTarget, propertyType);
+                CheckDestructuringTarget(field.NestedTarget, boundType);
         }
     }
 

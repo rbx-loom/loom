@@ -182,6 +182,7 @@ public static class InternalCodes
     public const string UnusedTrait = "L458";
     public const string RealmRestrictedApiMember = "L459";
     public const string GenericEventDeclaration = "L460";
+    public const string DuplicateStaticMember = "L461";
 
     public const string SimplifiableCode = "L500";
 }

@@ -102,6 +102,36 @@ public class ModuleRequirePathTest
         );
 
     /// <remarks>A specifier naming the file directly already works unresolved - it is only the folder-fold that needs help.</remarks>
+    /// <remarks>A trailing separator names the same folder, so it has to fold through <c>main</c> just as the bare specifier does.</remarks>
+    [Theory]
+    [InlineData("./util/")]
+    [InlineData("./util//")]
+    [InlineData("./util/inner/..")]
+    public void FallsBack_ToTheMainFilesOwnPath_WhenTheFolderSpecifierIsWrittenUnusually(string specifier) =>
+        Utility.WithTempProject(
+            [("app.loom", $"import {{ helper }} from \"{specifier}\"\nprint(helper);"), (Path.Combine("util", "main.loom"), "export let helper = 1;")],
+            (_, result) =>
+            {
+                Utility.AssertNoErrors(result);
+                Assert.Contains("require(\"./util/main\")", AppOutput(result));
+            }
+        );
+
+    [Fact]
+    public void FallsBack_ToTheMainFilesOwnPath_ForAParentFolderSpecifier() =>
+        Utility.WithTempProject(
+            [
+                (Path.Combine("util", "main.loom"), "export let helper = 1;"),
+                (Path.Combine("util", "inner", "app.loom"), "import { helper } from \"../\"\nprint(helper);")
+            ],
+            (_, result) =>
+            {
+                Utility.AssertNoErrors(result);
+                var app = result.Files.Single(file => file.SourceFile.Name == "app.loom").RenderedLuau;
+                Assert.Contains("require(\"../main\")", app);
+            }
+        );
+
     [Fact]
     public void FallsBack_ToTheSpecifier_WhenItAlreadyNamesAMainFileDirectly() =>
         Utility.WithTempProject(

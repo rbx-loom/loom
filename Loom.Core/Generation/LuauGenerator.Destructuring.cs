@@ -9,7 +9,10 @@ public sealed partial class LuauGenerator
 {
     public override LuauNode VisitDestructuringDeclaration(DestructuringDeclaration destructuringDeclaration)
     {
-        var initializerExpression = destructuringDeclaration.EqualsValueClause!.Value;
+        if (destructuringDeclaration.EqualsValueClause == null)
+            return new NoOpStatement();
+
+        var initializerExpression = destructuringDeclaration.EqualsValueClause.Value;
         if (destructuringDeclaration.Target is TupleDestructuringTarget tupleTarget)
             return EmitTupleDestructuring(tupleTarget, initializerExpression);
 
