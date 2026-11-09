@@ -143,7 +143,7 @@ public partial class TypeCheckerTest
     }
 
     [Fact]
-    public void Checks_ObjectDestructuringField_WithDefault_BindsPropertyType()
+    public void Checks_ObjectDestructuringField_WithDefault_BindsPropertyTypeWithoutNone()
     {
         var type = Utility.GetLastStatementType(
             """
@@ -154,7 +154,7 @@ public partial class TypeCheckerTest
             """
         );
 
-        Assert.Equal("number?", type.ToString());
+        Assert.Equal(PrimitiveType.Number, type);
     }
 
     [Fact]
@@ -180,5 +180,109 @@ public partial class TypeCheckerTest
 
         var diagnostics = Utility.GetTypeCheckerDiagnostics(source);
         Utility.AssertDiagnostic(diagnostics, InternalCodes.TypeMismatch, "Type '\"not a number\"' is not assignable to type 'number?'.");
+    }
+
+    [Fact]
+    public void Checks_NestedDestructuring_DefaultedOptionalField_ThenDestructuresTheRemainder()
+    {
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(
+            """
+            interface Address { city: string }
+            interface User { address: Address? }
+            fn run(user: User, fallback: Address) {
+                let { address: { city } = fallback } = user;
+                print(city);
+            }
+            """
+        );
+
+        Utility.AssertNoErrors(diagnostics);
+    }
+
+    [Fact]
+    public void ThrowsFor_ObjectDestructuring_OfAnOptionalSource()
+    {
+        const string source = """
+            interface User { name: string }
+            fn run(maybe: User?) {
+                let { name } = maybe;
+                print(name);
+            }
+            """;
+
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(source);
+        Utility.AssertDiagnostic(diagnostics, InternalCodes.PossiblyNoneAccess, "'User?' is possibly 'none'.");
+    }
+
+    [Fact]
+    public void ThrowsFor_NestedDestructuring_ThroughAnOptionalField()
+    {
+        const string source = """
+            interface Address { city: string }
+            interface User { address: Address? }
+            fn run(user: User) {
+                let { address: { city } } = user;
+                print(city);
+            }
+            """;
+
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(source);
+        Utility.AssertDiagnostic(diagnostics, InternalCodes.PossiblyNoneAccess, "'Address?' is possibly 'none'.");
+    }
+
+    [Fact]
+    public void ThrowsFor_ArrayDestructuring_OfAnOptionalSource()
+    {
+        const string source = """
+            fn run(maybe: number[]?) {
+                let [first] = maybe;
+                print(first);
+            }
+            """;
+
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(source);
+        Utility.AssertDiagnostic(diagnostics, InternalCodes.PossiblyNoneAccess, "'number[]?' is possibly 'none'.");
+    }
+
+    [Fact]
+    public void Checks_ObjectDestructuring_OfANarrowedOptionalSource_IsAccepted()
+    {
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(
+            """
+            interface User { name: string }
+            fn run(maybe: User?) {
+                if maybe != none {
+                    let { name } = maybe;
+                    print(name);
+                }
+            }
+            """
+        );
+
+        Utility.AssertNoErrors(diagnostics);
+    }
+
+    [Fact]
+    public void Checks_NamedArgument_TypePredicate_NarrowsTheArgumentNamedForTheParameter()
+    {
+        var diagnostics = Utility.GetTypeCheckerDiagnostics(
+            """
+            fn is_text(a: unknown, b: unknown): b is string {
+                return match b {
+                    s when string -> true,
+                    _ -> false,
+                };
+            }
+
+            fn run(x: unknown, y: unknown) {
+                if is_text(b: x, a: y) {
+                    let s: string = x;
+                    print(s);
+                }
+            }
+            """
+        );
+
+        Utility.AssertNoErrors(diagnostics);
     }
 }
